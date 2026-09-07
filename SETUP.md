@@ -1,5 +1,29 @@
 # Setup
 
+## Current state
+
+Supabase project **`lvahxlekhanratmbgcug`** is live and configured:
+
+- [x] 1. Supabase project created
+- [x] 2. Schema run — `tasks` and `projects` exist, RLS verified as blocking
+      anonymous reads *and* writes
+- [x] 3–5. Google OAuth client created (consent screen **Internal**, so Google
+      itself refuses non-`@arbisoft.com` accounts) and enabled in Supabase
+- [x] 6. `ALLOWED_EMAIL_DOMAINS=arbisoft.com`
+- [x] 7. Redirect allow list configured for `http://localhost:3000`
+- [ ] 9. Deploy to Netlify
+- [ ] 10. Add the production URL to Google and Supabase
+
+Steps 1–8 below are kept for reference, and for anyone rebuilding this from
+scratch. Jump to step 9 to deploy.
+
+**Housekeeping:** disable the **Email** provider in Supabase if it is still on.
+The app only uses Google, and leaving email signup enabled lets anyone holding
+the (public) publishable key create accounts in the project. RLS means they see
+nothing, but there is no reason to allow it.
+
+---
+
 Roughly 30 minutes. **Do these in order.** Steps 3 and 4 reference values
 produced by steps 1 and 2, and doing them out of sequence is where the time goes.
 
