@@ -91,8 +91,13 @@
   --sidebar-w: 248px;
   --content-max: 760px;
 
-  /* Completion is the only animation in the app. */
-  --complete-ms: 260ms;
+  /* Motion.
+     Completion is the loud moment; everything else is barely perceptible. If
+     the small stuff competes, finishing a task stops feeling like anything.
+     All of it is hard and physical — a stamp, not a bubble. No blur, no bounce. */
+  --complete-ms: 320ms;
+  --thunk-ms: 180ms;
+  --tick-ms: 200ms;
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -368,6 +373,18 @@ button {
   box-shadow: var(--offset-shadow);
 }
 
+/* The dread thunk: on Enter the field presses down into its own shadow and
+   springs back, like stamping a form you would rather not have filled in. */
+@keyframes capture-thunk {
+  0%   { transform: translate(0, 0);   box-shadow: var(--offset-shadow); }
+  45%  { transform: translate(4px, 4px); box-shadow: 0 0 0 var(--brand-navy); }
+  100% { transform: translate(0, 0);   box-shadow: var(--offset-shadow); }
+}
+
+.capture-field[data-thunk='true'] {
+  animation: capture-thunk var(--thunk-ms) var(--ease-out);
+}
+
 .capture-input {
   flex: 1;
   border: none;
@@ -481,6 +498,12 @@ button {
   top: 0;
   bottom: 0;
   width: 6px;
+  transition: width 90ms var(--ease-out);
+}
+
+/* Barely subliminal. You feel it more than see it. */
+.task-row:hover[data-priority]::before {
+  width: 9px;
 }
 
 .task-row[data-priority='high']::before   { background: var(--priority-high); }
@@ -501,8 +524,10 @@ button {
   color: transparent;
 }
 
+/* Ghost tick: show the outcome faintly before they commit to it. */
 .task-checkbox:hover {
   box-shadow: 3px 3px 0 var(--light-salmon);
+  color: rgb(13 55 100 / 0.28);
 }
 
 .task-checkbox[data-checked='true'] {
@@ -519,6 +544,10 @@ button {
   line-height: var(--leading-tight);
   color: var(--text);
   word-break: break-word;
+  /* Shrink-wrap the text so the completion strike ends at the last word rather
+     than running the full width of the row. Still wraps at the row edge. */
+  width: fit-content;
+  max-width: 100%;
 }
 
 /* Expanding a row swaps the title for an input. Without an explicit width it
@@ -581,14 +610,28 @@ input.task-title {
   color: var(--brand-orange);
 }
 
-/* --- Completion ----------------------------------------------------------
-   The one animated moment in the app: it is the only feedback that confirms
-   something actually changed. Nothing else animates. */
+/* --- Completion: the release ---------------------------------------------
+   The loudest moment in the app, and the only one with a real beat to it:
+   the row winds up left, a line sweeps through the title, then it leaves to
+   the right. Everything else in here stays quieter than this on purpose. */
 
 @keyframes task-complete {
   0%   { opacity: 1; transform: translateX(0); }
-  35%  { opacity: 1; transform: translateX(6px); }
-  100% { opacity: 0; transform: translateX(0); }
+  18%  { opacity: 1; transform: translateX(-5px); }   /* wind up */
+  55%  { opacity: 1; transform: translateX(-5px); }   /* hold while it strikes */
+  100% { opacity: 0; transform: translateX(26px); }   /* release */
+}
+
+/* Press, like a rubber stamp coming down. */
+@keyframes checkbox-stamp {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.8); }
+  100% { transform: scale(1); }
+}
+
+@keyframes strike-through {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
 }
 
 .task-row[data-completing='true'] {
@@ -596,9 +639,73 @@ input.task-title {
   pointer-events: none;
 }
 
+/* Fill immediately: the state change should read before the row leaves, not
+   after. React updates the real value once the animation has finished. */
+.task-row[data-completing='true'] .task-checkbox {
+  background: var(--done);
+  border-color: var(--done);
+  color: #ffffff;
+  box-shadow: none;
+  animation: checkbox-stamp 200ms var(--ease-out);
+}
+
+.task-row[data-completing='true'] .task-title {
+  position: relative;
+}
+
+.task-row[data-completing='true'] .task-title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: currentColor;
+  transform-origin: left center;
+  animation: strike-through 130ms var(--ease-out) 60ms both;
+}
+
+/* --- Arrival -------------------------------------------------------------- */
+
+/* A newly captured task drops in from above, so your eye lands where it went. */
+@keyframes row-drop {
+  from { opacity: 0; transform: translateY(-7px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.task-row[data-entering='true'] {
+  animation: row-drop var(--thunk-ms) var(--ease-out);
+}
+
+/* Counts nudge when they change, so the number moving is noticeable without
+   being distracting. */
+@keyframes count-tick {
+  from { opacity: 0.4; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.nav-item-count {
+  animation: count-tick var(--tick-ms) var(--ease-out);
+}
+
+/* Every bit of delight above is optional. Completion still collapses the row
+   so the list stays correct — it just does it instantly. */
 @media (prefers-reduced-motion: reduce) {
-  .task-row[data-completing='true'] {
+  .task-row[data-completing='true'],
+  .task-row[data-entering='true'],
+  .capture-field[data-thunk='true'],
+  .nav-item-count {
     animation-duration: 1ms;
+  }
+
+  .task-row[data-completing='true'] .task-checkbox,
+  .task-row[data-completing='true'] .task-title::after {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+
+  .task-row[data-priority]::before {
+    transition: none;
   }
 }
 

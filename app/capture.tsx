@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { Priority, Project, View } from '@/lib/types'
 
@@ -10,6 +10,20 @@ export type Draft = {
   due_date: string | null
   priority: Priority | null
 }
+
+/**
+ * Prompts rotate while the field is empty. Cheapest personality in the app —
+ * it costs no motion and no pixels, only words.
+ */
+const PROMPTS = [
+  "what's the oof?",
+  'what are you avoiding?',
+  'go on, admit it',
+  "what's nagging you?",
+  'name the dread',
+]
+
+const PROMPT_MS = 4000
 
 /**
  * The whole app is arranged around this input. It is autofocused, it is never
@@ -31,6 +45,18 @@ export function Capture({
   const [projectId, setProjectId] = useState<string | null>(null)
   const [dueDate, setDueDate] = useState<string>('')
   const [priority, setPriority] = useState<Priority | ''>('')
+  const [promptIndex, setPromptIndex] = useState(0)
+  const [thunk, setThunk] = useState(false)
+
+  // Never swap the prompt out from under someone mid-sentence.
+  useEffect(() => {
+    if (title) return
+    const id = setInterval(
+      () => setPromptIndex((i) => (i + 1) % PROMPTS.length),
+      PROMPT_MS,
+    )
+    return () => clearInterval(id)
+  }, [title])
 
   // Capturing inside a project should default to that project, but never
   // require it.
@@ -48,6 +74,11 @@ export function Capture({
       priority: priority || null,
     })
 
+    // Restart the thunk even on rapid captures: dropping the attribute for a
+    // frame is what lets the animation replay.
+    setThunk(false)
+    requestAnimationFrame(() => setThunk(true))
+
     // Clear the title but keep the attributes: capturing five tasks for the
     // same project in a row is common, re-picking it five times is not.
     setTitle('')
@@ -55,13 +86,17 @@ export function Capture({
 
   return (
     <div className="capture">
-      <div className="capture-field">
+      <div
+        className="capture-field"
+        data-thunk={thunk || undefined}
+        onAnimationEnd={() => setThunk(false)}
+      >
         <input
           className="capture-input"
           value={title}
           autoFocus
           maxLength={500}
-          placeholder="what needs doing?"
+          placeholder={PROMPTS[promptIndex]}
           aria-label="New task"
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {
@@ -123,12 +158,12 @@ export function Capture({
                 setPriority('')
               }}
             >
-              clear
+              nevermind
             </button>
           </>
         ) : (
           <button className="attr-toggle" onClick={() => setShowAttrs(true)}>
-            + add project, date or priority
+            + pin it down
           </button>
         )}
       </div>

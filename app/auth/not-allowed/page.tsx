@@ -12,8 +12,8 @@ export default function NotAllowedPage() {
   // having to ask anyone.
   const requirement =
     domains.length > 0
-      ? `Sign in with your ${domains.map((d) => `@${d}`).join(' or ')} account.`
-      : 'That account is not permitted.'
+      ? `daily oof is ${domains.map((d) => `@${d}`).join(' / ')} only.`
+      : 'that account is not on the list.'
 
   return (
     <main className="centred">
@@ -21,14 +21,14 @@ export default function NotAllowedPage() {
         <Brand />
 
         <div>
-          <h1 className="card-title">wrong account</h1>
+          <h1 className="card-title">not on the list.</h1>
           <p className="card-text">
-            {requirement} You have been signed out of the account you just used.
+            {requirement} we&rsquo;ve signed you out of the one you just used.
           </p>
         </div>
 
         <Link className="button" href="/login">
-          try a different account
+          try your work account
         </Link>
       </div>
     </main>

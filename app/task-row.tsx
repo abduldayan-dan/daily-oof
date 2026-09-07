@@ -10,6 +10,7 @@ export function TaskRow({
   projects,
   expanded,
   completing,
+  entering,
   onExpand,
   onToggle,
   onUpdate,
@@ -19,6 +20,7 @@ export function TaskRow({
   projects: Project[]
   expanded: boolean
   completing: boolean
+  entering: boolean
   onExpand: () => void
   onToggle: () => void
   onUpdate: (patch: Partial<Task>) => void
@@ -53,6 +55,7 @@ export function TaskRow({
       data-priority={task.priority ?? undefined}
       data-done={done}
       data-completing={completing}
+      data-entering={entering}
       onClick={onExpand}
     >
       <button

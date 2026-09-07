@@ -21,7 +21,9 @@ export default async function LoginPage({
       <div className="card">
         <div>
           <Brand as="h1" large />
-          <p className="card-text">A quiet place for your own work.</p>
+          <p className="card-text">
+            the things you&rsquo;re putting off, neatly listed.
+          </p>
         </div>
 
         {error ? (

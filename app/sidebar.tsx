@@ -125,7 +125,13 @@ function NavItem({
     <button className="nav-item" aria-current={current} onClick={onClick}>
       {colour ? <span className="project-dot" data-color={colour} /> : null}
       <span className="nav-item-name">{label}</span>
-      {count ? <span className="nav-item-count">{count}</span> : null}
+      {/* Keying on the value remounts the span when the number changes, which
+          replays the tick animation without any state of its own. */}
+      {count ? (
+        <span className="nav-item-count" key={count}>
+          {count}
+        </span>
+      ) : null}
     </button>
   )
 }
