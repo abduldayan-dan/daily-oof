@@ -22,7 +22,7 @@ const robotoMono = Roboto_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'nurture · tasks',
+  title: 'daily oof',
   description: 'A quiet place for your own work.',
 }
 

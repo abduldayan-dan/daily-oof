@@ -19,10 +19,8 @@ export default async function LoginPage({
   return (
     <main className="centred">
       <div className="card">
-        <Brand />
-
         <div>
-          <h1 className="card-title">tasks</h1>
+          <Brand as="h1" large />
           <p className="card-text">A quiet place for your own work.</p>
         </div>
 
