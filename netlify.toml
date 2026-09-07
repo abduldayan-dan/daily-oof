@@ -1,0 +1,10 @@
+# Netlify auto-detects Next.js and installs its Next.js runtime, so this file is
+# mostly here to pin the Node version. Netlify's default can lag behind what
+# Next 15 expects, and the resulting build error is not obvious.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"

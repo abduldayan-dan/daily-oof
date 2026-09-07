@@ -1,42 +1,754 @@
+/* ==========================================================================
+   Nurture by Arbisoft — task app
+
+   Visual language follows DESIGN.md. The short version:
+     0px radius everywhere, 2px strokes, hard offset shadows with no blur,
+     lowercase UI copy, DM Serif for headings, Roboto Mono for everything else.
+
+   Every value worth changing is a custom property in :root. Edit the tokens,
+   not the rules, and the whole app moves together.
+   ========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* --- Type --------------------------------------------------------------
+     The mono/serif pairing is the system. Do not introduce a sans-serif. */
+  --font-serif: var(--font-dm-serif), Georgia, serif;
+  --font-mono: var(--font-roboto-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --text-xs: 0.75rem;   /* 12px — labels, captions */
+  --text-sm: 0.875rem;  /* 14px — body, nav, UI */
+  --text-md: 1rem;      /* 16px — capture input */
+  --text-xl: 2rem;      /* 32px — view heading, DM Serif */
+
+  --leading-tight: 1.4;
+  --leading-body: 1.6;
+
+  /* --- Solids ------------------------------------------------------------ */
+  --brand-orange: #e3492b;
+  --brand-green:  #1b998b;
+  --brand-navy:   #0d3764;
+  --eggshell:     #f5f0e3;
+  --light-gray:   #f4f4f4;
+
+  /* --- Pastels ----------------------------------------------------------- */
+  --baby-purple:    #dbcdf0;
+  --baby-cyan:      #97ecf1;
+  --light-salmon:   #f8a978;
+  --powder-blue:    #badfdb;
+  --baby-blue-eyes: #b2d0fd;
+  --baby-pink:      #f5cac3;
+  --hot-pink:       #ff5e98;
+  --yellow:         #fccc5d;
+
+  /* --- Applied roles ----------------------------------------------------- */
+  --bg:          var(--light-gray);   /* main app background, per DESIGN.md */
+  --bg-surface:  #ffffff;             /* cards and rows */
+  --bg-section:  var(--eggshell);     /* sidebar, page sections */
+  --bg-hover:    var(--light-gray);   /* card hover */
+  --bg-nested:   #e8e8e8;             /* expanded rows inside a white card */
+
+  --stroke: var(--brand-navy);
+  --stroke-width: 2px;
+
+  --text:           var(--brand-navy);
+  --text-secondary: rgb(13 55 100 / 0.60); /* accessibility floor for text */
+  --text-chrome:    rgb(13 55 100 / 0.50); /* decorative only, never body */
+
+  --accent: var(--brand-orange);
+
+  /* Priority reads as a thin bar on the row's leading edge, never a badge.
+     Badges make every row shout, and then none of them do. */
+  --priority-high:   var(--brand-orange);
+  --priority-medium: var(--yellow);
+  --priority-low:    var(--brand-green);
+
+  --overdue: var(--brand-orange);
+  --done:    var(--brand-green);
+
+  /* Project dots */
+  --project-slate:  var(--text-chrome);
+  --project-blue:   var(--baby-blue-eyes);
+  --project-green:  var(--brand-green);
+  --project-amber:  var(--yellow);
+  --project-red:    var(--brand-orange);
+  --project-purple: var(--baby-purple);
+
+  /* --- Space -------------------------------------------------------------
+     8px base, per DESIGN.md. */
+  --sp-xs:  4px;
+  --sp-sm:  8px;
+  --sp-md:  16px;
+  --sp-lg:  24px;
+  --sp-xl:  32px;
+  --sp-2xl: 48px;
+  --sp-3xl: 64px;
+
+  /* Hard offset shadow, zero blur. The brutalist signature — hover and press
+     states only, never at rest. */
+  --offset-shadow: 4px 4px 0 var(--brand-navy);
+  --offset-shadow-lg: 6px 6px 0 var(--light-salmon);
+
+  --sidebar-w: 248px;
+  --content-max: 760px;
+
+  /* Completion is the only animation in the app. */
+  --complete-ms: 260ms;
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* --- Reset ---------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-html,
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--text);
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-a {
+button,
+input,
+textarea,
+select {
+  font: inherit;
   color: inherit;
-  text-decoration: none;
+  border-radius: 0; /* iOS rounds inputs by default. */
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: var(--stroke-width) solid var(--brand-orange);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   App shell
+   ========================================================================== */
+
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.sidebar {
+  border-right: var(--stroke-width) solid var(--stroke);
+  background: var(--bg-section);
+  padding: var(--sp-lg) var(--sp-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xl);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+}
+
+.main {
+  padding: var(--sp-xl) var(--sp-lg) var(--sp-3xl);
+  display: flex;
+  justify-content: center;
+}
+
+.main-inner {
+  width: 100%;
+  max-width: var(--content-max);
+}
+
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: 1fr;
   }
+
+  /* Capture stays the first thing on screen. Stacking the sidebar above it
+     would push the input below the fold and put a scroll between you and the
+     two-second capture, which is the one thing this app exists to do. */
+  .main {
+    order: 1;
+    padding: var(--sp-md) var(--sp-md) var(--sp-xl);
+  }
+
+  .sidebar {
+    order: 2;
+    position: static;
+    height: auto;
+    border-right: none;
+    border-top: var(--stroke-width) solid var(--stroke);
+  }
+}
+
+/* ==========================================================================
+   Brand
+   ========================================================================== */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  background: var(--brand-orange);
+  display: grid;
+  place-items: center;
+}
+
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.brand-wordmark {
+  font-family: var(--font-serif);
+  font-size: 1.375rem;
+  line-height: 1;
+  color: var(--brand-navy);
+}
+
+/* ==========================================================================
+   Sidebar
+   ========================================================================== */
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.sidebar-label {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  color: var(--text-chrome);
+  padding: 0 var(--sp-sm);
+  margin-bottom: var(--sp-sm);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  width: 100%;
+  padding: var(--sp-sm);
+  color: var(--text-secondary);
+  text-align: left;
+  font-size: var(--text-sm);
+  border: var(--stroke-width) solid transparent;
+}
+
+.nav-item:hover {
+  color: var(--text);
+  background: var(--bg-surface);
+}
+
+.nav-item[aria-current='true'] {
+  background: var(--brand-orange);
+  border-color: var(--stroke);
+  color: #ffffff;
+}
+
+.nav-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-item-count {
+  font-size: var(--text-xs);
+  color: var(--text-chrome);
+}
+
+.nav-item:hover .nav-item-count {
+  color: var(--text-secondary);
+}
+
+.nav-item[aria-current='true'] .nav-item-count {
+  color: #ffffff;
+}
+
+.project-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border: var(--stroke-width) solid var(--stroke);
+  background: var(--project-slate);
+}
+
+.project-dot[data-color='blue']   { background: var(--project-blue); }
+.project-dot[data-color='green']  { background: var(--project-green); }
+.project-dot[data-color='amber']  { background: var(--project-amber); }
+.project-dot[data-color='red']    { background: var(--project-red); }
+.project-dot[data-color='purple'] { background: var(--project-purple); }
+
+.nav-item[aria-current='true'] .project-dot {
+  border-color: #ffffff;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: var(--sp-md);
+  border-top: var(--stroke-width) solid var(--stroke);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  align-items: flex-start;
+}
+
+.user-email {
+  font-size: var(--text-xs);
+  color: var(--text-chrome);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Capture
+
+   The single most important control in the app. Autofocused, always at the
+   top, never inside a modal.
+   ========================================================================== */
+
+.capture {
+  margin-bottom: var(--sp-xl);
+}
+
+.capture-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  background: var(--bg-surface);
+  border: var(--stroke-width) solid var(--stroke);
+  padding: var(--sp-md);
+}
+
+.capture-field:focus-within {
+  box-shadow: var(--offset-shadow);
+}
+
+.capture-input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: var(--text-md);
+  outline: none;
+  min-width: 0;
+}
+
+.capture-input::placeholder {
+  color: var(--text-chrome);
+}
+
+.capture-hint {
+  font-size: var(--text-sm);
+  color: var(--text-chrome);
+  flex-shrink: 0;
+}
+
+/* The attribute row stays collapsed until someone actually reaches for it. */
+.capture-attrs {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding-top: var(--sp-sm);
+  flex-wrap: wrap;
+}
+
+.attr-toggle {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  padding: var(--sp-xs) 0;
+  border-bottom: var(--stroke-width) solid transparent;
+}
+
+.attr-toggle:hover {
+  color: var(--brand-orange);
+  border-bottom-color: var(--brand-orange);
+}
+
+.attr-control {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text);
+  background: var(--bg-surface);
+  border: var(--stroke-width) solid var(--stroke);
+  padding: var(--sp-xs) var(--sp-sm);
+  outline: none;
+}
+
+.attr-control:focus {
+  box-shadow: var(--offset-shadow);
+}
+
+/* ==========================================================================
+   Task list
+   ========================================================================== */
+
+.view-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-md);
+}
+
+.view-title {
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.view-count {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.task-list {
+  list-style: none;
+  border: var(--stroke-width) solid var(--stroke);
+  background: var(--bg-surface);
+}
+
+.task-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--sp-md);
+  padding: var(--sp-md);
+  position: relative;
+  cursor: pointer;
+}
+
+/* Rules between rows only, so the list reads as one block rather than a stack
+   of separate cards. Adjacent 2px borders would double up to 4px. */
+.task-row + .task-row {
+  border-top: var(--stroke-width) solid var(--stroke);
+}
+
+.task-row:hover {
+  background: var(--bg-hover);
+}
+
+/* Priority: a thin bar on the leading edge. Quiet by design. */
+.task-row[data-priority]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+}
+
+.task-row[data-priority='high']::before   { background: var(--priority-high); }
+.task-row[data-priority='medium']::before { background: var(--priority-medium); }
+.task-row[data-priority='low']::before    { background: var(--priority-low); }
+
+/* Square, 2px stroke, white fill — the icon rule from DESIGN.md. Never round:
+   the no-radius rule covers every interactive element, checkboxes included. */
+.task-checkbox {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: var(--stroke-width) solid var(--stroke);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: transparent;
+}
+
+.task-checkbox:hover {
+  box-shadow: 3px 3px 0 var(--light-salmon);
+}
+
+.task-checkbox[data-checked='true'] {
+  background: var(--done);
+  color: #ffffff;
+}
+
+.task-body {
+  min-width: 0;
+}
+
+.task-title {
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* Expanding a row swaps the title for an input. Without an explicit width it
+   falls back to the browser default of roughly 20 characters and clips. */
+input.task-title {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  outline: none;
+}
+
+.task-row[data-done='true'] .task-title {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  margin-top: var(--sp-xs);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.task-meta:empty {
+  display: none;
+}
+
+.task-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xs);
+}
+
+.task-due[data-overdue='true'] {
+  color: var(--overdue);
+}
+
+.task-actions {
+  display: flex;
+  gap: var(--sp-xs);
+  opacity: 0;
+}
+
+.task-row:hover .task-actions,
+.task-row:focus-within .task-actions {
+  opacity: 1;
+}
+
+.icon-button {
+  color: var(--text-chrome);
+  padding: var(--sp-xs);
+  display: grid;
+  place-items: center;
+}
+
+.icon-button:hover {
+  color: var(--brand-orange);
+}
+
+/* --- Completion ----------------------------------------------------------
+   The one animated moment in the app: it is the only feedback that confirms
+   something actually changed. Nothing else animates. */
+
+@keyframes task-complete {
+  0%   { opacity: 1; transform: translateX(0); }
+  35%  { opacity: 1; transform: translateX(6px); }
+  100% { opacity: 0; transform: translateX(0); }
+}
+
+.task-row[data-completing='true'] {
+  animation: task-complete var(--complete-ms) var(--ease-out) forwards;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-row[data-completing='true'] {
+    animation-duration: 1ms;
+  }
+}
+
+/* --- Expanded editor ------------------------------------------------------ */
+
+.task-row:has(.task-editor) {
+  background: var(--bg-nested);
+}
+
+.task-editor {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-sm);
+  cursor: default;
+}
+
+.task-notes {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-surface);
+  border: var(--stroke-width) solid var(--stroke);
+  padding: var(--sp-sm);
+  outline: none;
+}
+
+.task-notes:focus {
+  box-shadow: var(--offset-shadow);
+}
+
+.editor-row {
+  display: flex;
+  gap: var(--sp-sm);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ==========================================================================
+   Empty states
+
+   Say what to do next, never "nothing here".
+   ========================================================================== */
+
+.empty {
+  padding: var(--sp-2xl) var(--sp-md);
+  text-align: center;
+}
+
+.empty-title {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  color: var(--text);
+  margin-bottom: var(--sp-sm);
+}
+
+.empty-hint {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-md) var(--sp-lg);
+  border: var(--stroke-width) solid var(--stroke);
+  background: var(--bg-surface);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.button:hover {
+  background: var(--bg-hover);
+  box-shadow: var(--offset-shadow);
+}
+
+.button[data-variant='primary'] {
+  background: var(--brand-orange);
+  color: #ffffff;
+}
+
+.button[data-variant='primary']:hover {
+  background: var(--brand-orange);
+}
+
+.button[data-variant='ghost'] {
+  border-color: transparent;
+  background: none;
+  color: var(--text-secondary);
+  padding: var(--sp-xs) 0;
+}
+
+.button[data-variant='ghost']:hover {
+  background: none;
+  box-shadow: none;
+  color: var(--brand-orange);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ==========================================================================
+   Login / interstitial pages
+   ========================================================================== */
+
+.centred {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-md);
+}
+
+.card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-lg);
+  background: var(--bg-surface);
+  border: var(--stroke-width) solid var(--stroke);
+  padding: var(--sp-xl);
+}
+
+.card-title {
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.card-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: var(--sp-sm);
+}
+
+.error-note {
+  font-size: var(--text-xs);
+  color: var(--brand-orange);
+  background: var(--bg-surface);
+  border: var(--stroke-width) solid var(--brand-orange);
+  padding: var(--sp-sm) var(--sp-md);
+  margin-bottom: var(--sp-md);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
