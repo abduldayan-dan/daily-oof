@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import { PROJECT_COLORS, normaliseColor, type ProjectColor } from '@/lib/colors'
 import type { Project, View } from '@/lib/types'
 
 import { Brand } from './brand'
@@ -13,6 +14,8 @@ export function Sidebar({
   counts,
   email,
   onCreateProject,
+  onUpdateProject,
+  onDeleteProject,
   onSignOut,
 }: {
   view: View
@@ -21,10 +24,13 @@ export function Sidebar({
   counts: { all: number; today: number; byProject: Map<string, number> }
   email: string
   onCreateProject: (name: string) => void
+  onUpdateProject: (id: string, patch: Partial<Project>) => void
+  onDeleteProject: (id: string) => void
   onSignOut: () => void
 }) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   function submit() {
     const trimmed = name.trim()
@@ -60,16 +66,44 @@ export function Sidebar({
       <div className="sidebar-section">
         <p className="sidebar-label">projects</p>
 
-        {projects.map((project) => (
-          <NavItem
-            key={project.id}
-            label={project.name}
-            colour={project.color}
-            count={counts.byProject.get(project.id) ?? 0}
-            current={view.kind === 'project' && view.projectId === project.id}
-            onClick={() => onSelect({ kind: 'project', projectId: project.id })}
-          />
-        ))}
+        {projects.map((project) =>
+          editingId === project.id ? (
+            <ProjectEditor
+              key={project.id}
+              project={project}
+              onSave={(patch) => {
+                onUpdateProject(project.id, patch)
+                setEditingId(null)
+              }}
+              onDelete={() => {
+                onDeleteProject(project.id)
+                setEditingId(null)
+              }}
+              onCancel={() => setEditingId(null)}
+            />
+          ) : (
+            <div className="nav-row" key={project.id}>
+              <NavItem
+                label={project.name}
+                colour={normaliseColor(project.color)}
+                count={counts.byProject.get(project.id) ?? 0}
+                current={
+                  view.kind === 'project' && view.projectId === project.id
+                }
+                onClick={() =>
+                  onSelect({ kind: 'project', projectId: project.id })
+                }
+              />
+              <button
+                className="nav-edit"
+                aria-label={`Edit ${project.name}`}
+                onClick={() => setEditingId(project.id)}
+              >
+                <PencilIcon />
+              </button>
+            </div>
+          ),
+        )}
 
         {adding ? (
           <input
@@ -108,6 +142,93 @@ export function Sidebar({
   )
 }
 
+function ProjectEditor({
+  project,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  project: Project
+  onSave: (patch: Partial<Project>) => void
+  onDelete: () => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState(project.name)
+  const [colour, setColour] = useState<ProjectColor>(
+    normaliseColor(project.color),
+  )
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  function save() {
+    const trimmed = name.trim()
+    // Empty names violate the schema's check constraint, so fall back rather
+    // than firing a request that is guaranteed to fail.
+    onSave({ name: trimmed ? trimmed.slice(0, 80) : project.name, color: colour })
+  }
+
+  return (
+    <div className="project-editor">
+      <input
+        className="attr-control"
+        autoFocus
+        maxLength={80}
+        aria-label="Project name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save()
+          if (e.key === 'Escape') onCancel()
+        }}
+      />
+
+      <div className="swatch-grid" role="group" aria-label="Project colour">
+        {PROJECT_COLORS.map((c) => (
+          <button
+            key={c.key}
+            className="swatch project-dot"
+            data-color={c.key}
+            aria-label={c.label}
+            aria-pressed={colour === c.key}
+            onClick={() => setColour(c.key)}
+          />
+        ))}
+      </div>
+
+      {confirmingDelete ? (
+        <>
+          <p className="editor-warning">
+            delete “{project.name}”? its tasks are kept and simply lose their
+            project.
+          </p>
+          <div className="editor-actions">
+            <button className="text-button" onClick={onDelete}>
+              yes, delete
+            </button>
+            <button
+              className="text-button"
+              onClick={() => setConfirmingDelete(false)}
+            >
+              keep it
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="editor-actions">
+          <button
+            className="text-button"
+            onClick={() => setConfirmingDelete(true)}
+          >
+            delete
+          </button>
+          <button className="text-button" onClick={save}>
+            save
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function NavItem({
   label,
   count,
@@ -133,5 +254,19 @@ function NavItem({
         </span>
       ) : null}
     </button>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true">
+      <path
+        d="M9.4 2.3l2.3 2.3-7 7-2.9.6.6-2.9 7-7z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }

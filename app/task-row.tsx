@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
+import { normaliseColor } from '@/lib/colors'
 import { formatCompleted, formatDue, isOverdue } from '@/lib/dates'
 import type { Priority, Project, Task } from '@/lib/types'
 
@@ -101,7 +102,10 @@ export function TaskRow({
         <div className="task-meta">
           {project ? (
             <span className="task-meta-item">
-              <span className="project-dot" data-color={project.color} />
+              <span
+                className="project-dot"
+                data-color={normaliseColor(project.color)}
+              />
               {project.name}
             </span>
           ) : null}
@@ -127,6 +131,29 @@ export function TaskRow({
       </div>
 
       <div className="task-actions">
+        {/* Clicking the row already expands it, but nothing said so. An explicit
+            pencil is what makes editing discoverable. */}
+        {expanded ? null : (
+          <button
+            className="icon-button"
+            aria-label={`Edit "${task.title}"`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onExpand()
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true">
+              <path
+                d="M9.4 2.3l2.3 2.3-7 7-2.9.6.6-2.9 7-7z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
+
         <button
           className="icon-button"
           data-danger="true"

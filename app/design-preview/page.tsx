@@ -26,9 +26,9 @@ function iso(offsetDays: number) {
 }
 
 const projects: Project[] = [
-  { id: 'p1', user_id: 'u', name: 'Onboarding', color: 'blue', archived: false, created_at: '2026-01-01' },
-  { id: 'p2', user_id: 'u', name: 'Design system', color: 'green', archived: false, created_at: '2026-01-02' },
-  { id: 'p3', user_id: 'u', name: 'Q4 release', color: 'amber', archived: false, created_at: '2026-01-03' },
+  { id: 'p1', user_id: 'u', name: 'Onboarding', color: 'sky', archived: false, created_at: '2026-01-01' },
+  { id: 'p2', user_id: 'u', name: 'Design system', color: 'mint', archived: false, created_at: '2026-01-02' },
+  { id: 'p3', user_id: 'u', name: 'Q4 release', color: 'salmon', archived: false, created_at: '2026-01-03' },
 ]
 
 const base = {

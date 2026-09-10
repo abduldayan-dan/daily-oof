@@ -65,13 +65,29 @@
   --overdue: var(--brand-orange);
   --done:    var(--brand-green);
 
-  /* Project dots */
-  --project-slate:  var(--text-chrome);
-  --project-blue:   var(--baby-blue-eyes);
-  --project-green:  var(--brand-green);
-  --project-amber:  var(--yellow);
-  --project-red:    var(--brand-orange);
-  --project-purple: var(--baby-purple);
+  /* Pastels added for the project palette. DESIGN.md defines eight; these five
+     extend the same family to twelve. hot-pink is deliberately excluded — it is
+     not pastel, and pairing it with brand-orange is forbidden, which is exactly
+     what an active nav item would do. */
+  --pastel-rose:     #f2b8cb;
+  --pastel-sand:     #efe0bc;
+  --pastel-mint:     #c3e8c0;
+  --pastel-lavender: #c9c6ec;
+  --pastel-stone:    #dcd9d4;
+
+  /* Project dots. Keys must match lib/colors.ts. */
+  --project-pink:     var(--baby-pink);
+  --project-rose:     var(--pastel-rose);
+  --project-salmon:   var(--light-salmon);
+  --project-yellow:   var(--yellow);
+  --project-sand:     var(--pastel-sand);
+  --project-mint:     var(--pastel-mint);
+  --project-powder:   var(--powder-blue);
+  --project-cyan:     var(--baby-cyan);
+  --project-sky:      var(--baby-blue-eyes);
+  --project-lavender: var(--pastel-lavender);
+  --project-purple:   var(--baby-purple);
+  --project-stone:    var(--pastel-stone);
 
   /* --- Space -------------------------------------------------------------
      8px base, per DESIGN.md. */
@@ -320,14 +336,115 @@ button {
   background: var(--project-slate);
 }
 
-.project-dot[data-color='blue']   { background: var(--project-blue); }
-.project-dot[data-color='green']  { background: var(--project-green); }
-.project-dot[data-color='amber']  { background: var(--project-amber); }
-.project-dot[data-color='red']    { background: var(--project-red); }
-.project-dot[data-color='purple'] { background: var(--project-purple); }
+.project-dot[data-color='pink']     { background: var(--project-pink); }
+.project-dot[data-color='rose']     { background: var(--project-rose); }
+.project-dot[data-color='salmon']   { background: var(--project-salmon); }
+.project-dot[data-color='yellow']   { background: var(--project-yellow); }
+.project-dot[data-color='sand']     { background: var(--project-sand); }
+.project-dot[data-color='mint']     { background: var(--project-mint); }
+.project-dot[data-color='powder']   { background: var(--project-powder); }
+.project-dot[data-color='cyan']     { background: var(--project-cyan); }
+.project-dot[data-color='sky']      { background: var(--project-sky); }
+.project-dot[data-color='lavender'] { background: var(--project-lavender); }
+.project-dot[data-color='purple']   { background: var(--project-purple); }
+.project-dot[data-color='stone']    { background: var(--project-stone); }
 
 .nav-item[aria-current='true'] .project-dot {
   border-color: #ffffff;
+}
+
+/* --- Project editing ------------------------------------------------------ */
+
+.nav-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.nav-row .nav-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.nav-edit {
+  opacity: 0;
+  padding: 0 var(--sp-sm);
+  color: var(--text-chrome);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.nav-row:hover .nav-edit,
+.nav-row:focus-within .nav-edit {
+  opacity: 1;
+}
+
+.nav-edit:hover {
+  color: var(--brand-orange);
+}
+
+.project-editor {
+  border: var(--stroke-width) solid var(--stroke);
+  background: var(--bg-surface);
+  padding: var(--sp-sm);
+  margin: var(--sp-xs) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.project-editor .attr-control {
+  width: 100%;
+}
+
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--sp-xs);
+}
+
+/* Swatches borrow .project-dot for the colour mapping, which carries a fixed
+   10px box. Override it or they render as tiny dots adrift in the grid. */
+.swatch {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border: var(--stroke-width) solid var(--stroke);
+  padding: 0;
+}
+
+/* Selected reads as a ring punched out of the middle — no radius, no glow. */
+.swatch[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 3px var(--bg-surface);
+}
+
+.swatch:hover {
+  box-shadow: 2px 2px 0 var(--brand-navy);
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+
+.text-button {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  padding: var(--sp-xs) 0;
+  border-bottom: var(--stroke-width) solid transparent;
+}
+
+.text-button:hover {
+  color: var(--brand-orange);
+  border-bottom-color: var(--brand-orange);
+}
+
+.editor-warning {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-tight);
 }
 
 .sidebar-footer {
@@ -550,14 +667,21 @@ button {
   max-width: 100%;
 }
 
-/* Expanding a row swaps the title for an input. Without an explicit width it
-   falls back to the browser default of roughly 20 characters and clips. */
+/* Expanding a row swaps the title for an input. Two things matter here: an
+   explicit width (or it falls back to ~20 characters and clips) and a visible
+   underline. Without the underline it looks identical to the static title and
+   nobody discovers that the row is editable. */
 input.task-title {
   width: 100%;
-  padding: 0;
+  padding: 0 0 var(--sp-xs);
   border: none;
+  border-bottom: var(--stroke-width) solid var(--stroke);
   background: none;
   outline: none;
+}
+
+input.task-title:focus {
+  border-bottom-color: var(--brand-orange);
 }
 
 .task-row[data-done='true'] .task-title {

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { createClient } from '@/lib/supabase/client'
+import { nextColor } from '@/lib/colors'
 import { openCounts, selectTasks } from '@/lib/sort'
 import type { Project, Task, View } from '@/lib/types'
 
@@ -220,9 +221,14 @@ export function Workspace({
 
   const createProject = useCallback(
     async (name: string) => {
+      // Pick the least-used colour rather than letting the column default to a
+      // neutral. Otherwise every project renders identically and the dots stop
+      // carrying any information.
+      const color = nextColor(projects.map((p) => p.color))
+
       const { data, error } = await supabase
         .from('projects')
-        .insert({ user_id: userId, name })
+        .insert({ user_id: userId, name, color })
         .select()
         .single()
 
@@ -232,7 +238,59 @@ export function Workspace({
       }
       setProjects((prev) => [...prev, data as Project])
     },
-    [supabase, userId],
+    [supabase, userId, projects],
+  )
+
+  const updateProject = useCallback(
+    async (id: string, patch: Partial<Project>) => {
+      const before = projects.find((p) => p.id === id)
+      if (!before) return
+
+      setProjects((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+      )
+
+      const { error } = await supabase
+        .from('projects')
+        .update(patch)
+        .eq('id', id)
+
+      if (error) {
+        setProjects((prev) => prev.map((p) => (p.id === id ? before : p)))
+        setError(`Could not save that project — ${error.message}`)
+      }
+    },
+    [supabase, projects],
+  )
+
+  const deleteProject = useCallback(
+    async (id: string) => {
+      const previousProjects = projects
+      const previousTasks = tasks
+
+      setProjects((prev) => prev.filter((p) => p.id !== id))
+
+      // Mirror the foreign key's ON DELETE SET NULL locally. Without this the
+      // rows keep pointing at a project that no longer exists and the metadata
+      // line renders nothing until a reload. Tasks are never deleted here —
+      // losing work because someone tidied up their projects is the worst
+      // possible bug in a tool people are learning to trust.
+      setTasks((prev) =>
+        prev.map((t) => (t.project_id === id ? { ...t, project_id: null } : t)),
+      )
+
+      if (view.kind === 'project' && view.projectId === id) {
+        setView({ kind: 'all' })
+      }
+
+      const { error } = await supabase.from('projects').delete().eq('id', id)
+      if (error) {
+        setProjects(previousProjects)
+        setTasks(previousTasks)
+        setError(`Could not delete that project — ${error.message}`)
+      }
+    },
+    [supabase, projects, tasks, view],
   )
 
   const signOut = useCallback(async () => {
@@ -269,6 +327,8 @@ export function Workspace({
         counts={counts}
         email={email}
         onCreateProject={createProject}
+        onUpdateProject={updateProject}
+        onDeleteProject={deleteProject}
         onSignOut={signOut}
       />
 
