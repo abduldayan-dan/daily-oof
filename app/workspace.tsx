@@ -9,6 +9,8 @@ import type { Project, Task, View } from '@/lib/types'
 
 import { Capture, type Draft } from './capture'
 import { Confetti } from './confetti'
+import { DoneSearch } from './done-search'
+import { DoneSummary } from './done-summary'
 import { Sidebar } from './sidebar'
 import { TaskRow } from './task-row'
 
@@ -83,13 +85,28 @@ export function Workspace({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [enteringProjectId, setEnteringProjectId] = useState<string | null>(null)
   const [clearedView, setClearedView] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const visible = useMemo(() => selectTasks(tasks, view), [tasks, view])
+  const visible = useMemo(() => {
+    const selected = selectTasks(tasks, view)
+    const q = query.trim().toLowerCase()
+    if (view.kind !== 'done' || !q) return selected
+
+    // Notes are searched too — the useful detail is often there rather than in
+    // a title written in two seconds.
+    return selected.filter(
+      (task) =>
+        task.title.toLowerCase().includes(q) ||
+        (task.notes ?? '').toLowerCase().includes(q),
+    )
+  }, [tasks, view, query])
+
   const counts = useMemo(() => openCounts(tasks), [tasks])
 
   const selectView = useCallback((next: View) => {
     setClearedView(null)
+    setQuery('')
     setView(next)
   }, [])
 
@@ -330,9 +347,15 @@ export function Workspace({
       : `${visible.length} ${visible.length === 1 ? 'oof' : 'oofs'}`
 
   const justCleared = clearedView === viewKey(view)
-  const empty =
-    (justCleared ? CLEARED_STATES[view.kind] : undefined) ??
-    EMPTY_STATES[view.kind]
+  const searching = view.kind === 'done' && query.trim().length > 0
+
+  const empty = searching
+    ? {
+        title: 'nothing matches that.',
+        hint: 'try a shorter word, or clear the search.',
+      }
+    : ((justCleared ? CLEARED_STATES[view.kind] : undefined) ??
+      EMPTY_STATES[view.kind])
 
   return (
     <div className="app">
@@ -351,7 +374,18 @@ export function Workspace({
 
       <main className="main">
         <div className="main-inner">
-          <Capture projects={projects} view={view} onCreate={createTask} />
+          {/* Done is the one view you cannot capture from — it is a record, not
+              a place to add work. The search takes the same slot so the top of
+              the page keeps its shape between views. */}
+          {view.kind === 'done' ? (
+            <DoneSearch value={query} onChange={setQuery} />
+          ) : (
+            <Capture projects={projects} view={view} onCreate={createTask} />
+          )}
+
+          {view.kind === 'done' && !searching ? (
+            <DoneSummary tasks={tasks} />
+          ) : null}
 
           {error ? (
             <p className="error-note" role="alert" onClick={() => setError(null)}>

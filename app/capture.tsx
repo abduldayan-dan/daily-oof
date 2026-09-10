@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
+import { todayISO } from '@/lib/dates'
 import type { Priority, Project, View } from '@/lib/types'
 
 export type Draft = {
@@ -76,10 +77,14 @@ export function Capture({
     return () => clearInterval(id)
   }, [title])
 
-  // Capturing inside a project should default to that project, but never
-  // require it.
+  // Capturing inside a view should inherit that view's context, but never
+  // require it. Adding a task while looking at Today and having it not appear
+  // in Today is the kind of thing that quietly erodes trust in the list.
   const effectiveProjectId =
     projectId ?? (view.kind === 'project' ? view.projectId : null)
+
+  const effectiveDueDate =
+    dueDate || (view.kind === 'today' ? todayISO() : null)
 
   function submit() {
     const trimmed = title.trim()
@@ -88,7 +93,7 @@ export function Capture({
     onCreate({
       title: trimmed.slice(0, 500),
       project_id: effectiveProjectId,
-      due_date: dueDate || null,
+      due_date: effectiveDueDate,
       priority: priority || null,
     })
 
@@ -147,11 +152,13 @@ export function Capture({
               ))}
             </select>
 
+            {/* Shows the inherited date rather than an empty box, so the
+                default is visible and can be overridden. */}
             <input
               className="attr-control"
               type="date"
               aria-label="Due date"
-              value={dueDate}
+              value={effectiveDueDate ?? ''}
               onChange={(e) => setDueDate(e.target.value)}
             />
 

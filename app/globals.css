@@ -1048,6 +1048,7 @@ input.task-title[data-saved='true'] {
   .error-note,
   .empty-title,
   .empty-hint,
+  .done-summary,
   .swatch[aria-pressed='true'],
   .task-notes[data-saved='true'],
   input.task-title[data-saved='true'] {
@@ -1142,6 +1143,65 @@ input.task-title[data-saved='true'] {
 .empty-hint {
   font-size: var(--text-xs);
   color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Done summary
+
+   The Done view is a record of finished work, so it should feel like one.
+   Navy on powder-blue is a sanctioned pairing in DESIGN.md — solid on pastel.
+   ========================================================================== */
+
+.done-summary {
+  border: var(--stroke-width) solid var(--stroke);
+  background: var(--powder-blue);
+  padding: var(--sp-lg);
+  margin-bottom: var(--sp-xl);
+  animation: empty-in 300ms var(--ease-out) backwards;
+}
+
+.done-headline {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  line-height: 1.15;
+  color: var(--brand-navy);
+  margin-bottom: var(--sp-lg);
+}
+
+/* The three read as a set, so keeping them on one line matters more than the
+   generous gap. Measured: they need ~195px, which fits any real phone once the
+   gap comes down. Still wraps rather than overflowing if it has to. */
+.done-stats {
+  display: flex;
+  gap: var(--sp-lg);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 380px) {
+  .done-stats {
+    gap: var(--sp-md);
+  }
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.stat-value {
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--brand-navy);
+  /* Mono would be steadier, but these climb on mount and the serif is what
+     makes them read as an achievement rather than a readout. */
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: var(--text-xs);
+  color: rgb(13 55 100 / 0.7);
 }
 
 /* ==========================================================================
