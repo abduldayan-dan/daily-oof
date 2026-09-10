@@ -8,11 +8,13 @@ import { openCounts, selectTasks } from '@/lib/sort'
 import type { Project, Task, View } from '@/lib/types'
 
 import { Capture, type Draft } from './capture'
+import { Confetti } from './confetti'
 import { Sidebar } from './sidebar'
 import { TaskRow } from './task-row'
 
-/** Keep in step with --complete-ms in globals.css. */
+/** Keep these in step with --complete-ms and the delete animation in globals.css. */
 const COMPLETE_MS = 320
+const DELETE_MS = 220
 
 type EmptyCopy = { title: string; hint: string }
 
@@ -78,6 +80,8 @@ export function Workspace({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [completing, setCompleting] = useState<Set<string>>(new Set())
   const [enteringId, setEnteringId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [enteringProjectId, setEnteringProjectId] = useState<string | null>(null)
   const [clearedView, setClearedView] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -189,10 +193,11 @@ export function Workspace({
     [supabase, tasks, view],
   )
 
+  /** Resolves true when the write landed, so the row can confirm it visibly. */
   const updateTask = useCallback(
-    async (id: string, patch: Partial<Task>) => {
+    async (id: string, patch: Partial<Task>): Promise<boolean> => {
       const before = tasks.find((t) => t.id === id)
-      if (!before) return
+      if (!before) return false
 
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
 
@@ -200,7 +205,9 @@ export function Workspace({
       if (error) {
         setTasks((prev) => prev.map((t) => (t.id === id ? before : t)))
         setError(`Could not save that change — ${error.message}`)
+        return false
       }
+      return true
     },
     [supabase, tasks],
   )
@@ -208,9 +215,17 @@ export function Workspace({
   const deleteTask = useCallback(
     async (id: string) => {
       const before = tasks
+
+      // Start the write and the collapse together, so the animation is spent on
+      // feedback rather than added on top of the round trip.
+      const write = supabase.from('tasks').delete().eq('id', id)
+
+      setDeletingId(id)
+      await new Promise((resolve) => setTimeout(resolve, DELETE_MS))
+      setDeletingId(null)
       setTasks((prev) => prev.filter((t) => t.id !== id))
 
-      const { error } = await supabase.from('tasks').delete().eq('id', id)
+      const { error } = await write
       if (error) {
         setTasks(before)
         setError(`Could not delete that task — ${error.message}`)
@@ -237,6 +252,7 @@ export function Workspace({
         return
       }
       setProjects((prev) => [...prev, data as Project])
+      setEnteringProjectId((data as Project).id)
     },
     [supabase, userId, projects],
   )
@@ -326,6 +342,7 @@ export function Workspace({
         projects={projects}
         counts={counts}
         email={email}
+        enteringProjectId={enteringProjectId}
         onCreateProject={createProject}
         onUpdateProject={updateProject}
         onDeleteProject={deleteProject}
@@ -349,11 +366,20 @@ export function Workspace({
 
           {visible.length === 0 ? (
             <div className="empty">
+              {justCleared ? <Confetti /> : null}
               <p className="empty-title">{empty.title}</p>
               <p className="empty-hint">{empty.hint}</p>
+              <div className="empty-marks" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
             </div>
           ) : (
-            <ul className="task-list">
+            /* Keyed on the view so switching remounts the rows and the stagger
+               plays. Rows are keyed by task id inside a view, so this never
+               fires when a single task is completed or deleted. */
+            <ul className="task-list" key={viewKey(view)}>
               {visible.map((task) => (
                 <TaskRow
                   key={task.id}
@@ -362,6 +388,7 @@ export function Workspace({
                   expanded={expandedId === task.id}
                   completing={completing.has(task.id)}
                   entering={enteringId === task.id}
+                  deleting={deletingId === task.id}
                   onExpand={() =>
                     setExpandedId((id) => (id === task.id ? null : task.id))
                   }

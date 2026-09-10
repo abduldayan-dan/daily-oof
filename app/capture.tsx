@@ -15,13 +15,29 @@ export type Draft = {
  * Prompts rotate while the field is empty. Cheapest personality in the app —
  * it costs no motion and no pixels, only words.
  */
-const PROMPTS = [
+/**
+ * Rendered on the server too, so this must be the same on both sides. The
+ * hour-aware set is swapped in after mount — computing the time during render
+ * would mismatch whenever the server and the browser disagree about the clock.
+ */
+const DEFAULT_PROMPTS = [
   "what's the oof?",
   'what are you avoiding?',
   'go on, admit it',
-  "what's nagging you?",
-  'name the dread',
 ]
+
+function promptsForHour(hour: number): string[] {
+  if (hour >= 21 || hour < 5) {
+    return ['go home', 'this can wait until tomorrow', 'still up?']
+  }
+  if (hour >= 17) {
+    return ['still here?', 'one more, then?', "what's left?"]
+  }
+  if (hour >= 12) {
+    return ["what's nagging you?", 'name the dread', 'what are you avoiding?']
+  }
+  return DEFAULT_PROMPTS
+}
 
 const PROMPT_MS = 4000
 
@@ -46,15 +62,17 @@ export function Capture({
   const [dueDate, setDueDate] = useState<string>('')
   const [priority, setPriority] = useState<Priority | ''>('')
   const [promptIndex, setPromptIndex] = useState(0)
+  const [prompts, setPrompts] = useState<string[]>(DEFAULT_PROMPTS)
   const [thunk, setThunk] = useState(false)
+
+  useEffect(() => {
+    setPrompts(promptsForHour(new Date().getHours()))
+  }, [])
 
   // Never swap the prompt out from under someone mid-sentence.
   useEffect(() => {
     if (title) return
-    const id = setInterval(
-      () => setPromptIndex((i) => (i + 1) % PROMPTS.length),
-      PROMPT_MS,
-    )
+    const id = setInterval(() => setPromptIndex((i) => i + 1), PROMPT_MS)
     return () => clearInterval(id)
   }, [title])
 
@@ -96,7 +114,7 @@ export function Capture({
           value={title}
           autoFocus
           maxLength={500}
-          placeholder={PROMPTS[promptIndex]}
+          placeholder={prompts[promptIndex % prompts.length]}
           aria-label="New task"
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {
@@ -162,8 +180,11 @@ export function Capture({
             </button>
           </>
         ) : (
+          // Names the three controls it reveals. "pin it down" read as
+          // atmosphere — nobody guessed a due date was behind it. A
+          // comma-separated noun list also sits better in mono than a sentence.
           <button className="attr-toggle" onClick={() => setShowAttrs(true)}>
-            + pin it down
+            + date, project, priority
           </button>
         )}
       </div>

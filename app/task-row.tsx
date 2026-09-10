@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { normaliseColor } from '@/lib/colors'
 import { formatCompleted, formatDue, isOverdue } from '@/lib/dates'
 import type { Priority, Project, Task } from '@/lib/types'
+
+/** Keep in step with the save-flash animation in globals.css. */
+const SAVE_FLASH_MS = 900
 
 export function TaskRow({
   task,
@@ -12,6 +15,7 @@ export function TaskRow({
   expanded,
   completing,
   entering,
+  deleting,
   onExpand,
   onToggle,
   onUpdate,
@@ -22,13 +26,39 @@ export function TaskRow({
   expanded: boolean
   completing: boolean
   entering: boolean
+  deleting: boolean
   onExpand: () => void
   onToggle: () => void
-  onUpdate: (patch: Partial<Task>) => void
+  onUpdate: (patch: Partial<Task>) => Promise<boolean>
   onDelete: () => void
 }) {
   const [notes, setNotes] = useState(task.notes ?? '')
   const [title, setTitle] = useState(task.title)
+  const [saved, setSaved] = useState<'title' | 'notes' | null>(null)
+  const rowRef = useRef<HTMLLIElement>(null)
+
+  // The delete animation collapses from the row's real height. Measured here
+  // because a guessed max-height makes the first half of the collapse look like
+  // nothing is happening on short rows.
+  useLayoutEffect(() => {
+    if (!deleting || !rowRef.current) return
+    rowRef.current.style.setProperty(
+      '--row-height',
+      `${rowRef.current.offsetHeight}px`,
+    )
+  }, [deleting])
+
+  useEffect(() => {
+    if (!saved) return
+    const id = setTimeout(() => setSaved(null), SAVE_FLASH_MS)
+    return () => clearTimeout(id)
+  }, [saved])
+
+  /** Confirm the write landed. A failed save used to look exactly like a good one. */
+  async function commit(field: 'title' | 'notes', patch: Partial<Task>) {
+    const ok = await onUpdate(patch)
+    if (ok) setSaved(field)
+  }
 
   // Re-sync when the row is reused for different data, or when an optimistic
   // insert is swapped for the saved row.
@@ -47,16 +77,18 @@ export function TaskRow({
       setTitle(task.title) // Empty titles violate the schema check constraint.
       return
     }
-    if (trimmed !== task.title) onUpdate({ title: trimmed.slice(0, 500) })
+    if (trimmed !== task.title) commit('title', { title: trimmed.slice(0, 500) })
   }
 
   return (
     <li
+      ref={rowRef}
       className="task-row"
       data-priority={task.priority ?? undefined}
       data-done={done}
       data-completing={completing}
       data-entering={entering}
+      data-deleting={deleting}
       onClick={onExpand}
     >
       <button
@@ -84,6 +116,7 @@ export function TaskRow({
         {expanded ? (
           <input
             className="capture-input task-title"
+            data-saved={saved === 'title' ? 'true' : undefined}
             value={title}
             maxLength={500}
             aria-label="Task title"
@@ -180,13 +213,14 @@ export function TaskRow({
         <div className="task-editor" onClick={(e) => e.stopPropagation()}>
           <textarea
             className="task-notes"
+            data-saved={saved === 'notes' ? 'true' : undefined}
             value={notes}
             placeholder="notes"
             aria-label="Notes"
             onChange={(e) => setNotes(e.target.value)}
             onBlur={() => {
               if (notes !== (task.notes ?? '')) {
-                onUpdate({ notes: notes || null })
+                commit('notes', { notes: notes || null })
               }
             }}
           />

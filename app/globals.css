@@ -812,14 +812,247 @@ input.task-title:focus {
   animation: count-tick var(--tick-ms) var(--ease-out);
 }
 
+/* --- Press ---------------------------------------------------------------
+   DESIGN.md specifies offset shadows for "hover/press states" and only hover
+   was ever built. Pressing moves the element into its own shadow, which is the
+   same physical idea as the capture thunk. Nothing in this app used to respond
+   to actually being clicked. */
+
+.button:active,
+.swatch:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 var(--brand-navy);
+}
+
+.button[data-variant='ghost']:active {
+  transform: translate(2px, 2px);
+}
+
+.nav-item:active,
+.text-button:active,
+.attr-toggle:active {
+  transform: translate(2px, 2px);
+}
+
+.icon-button:active,
+.nav-edit:active,
+.task-checkbox:active {
+  transform: translate(1px, 1px);
+}
+
+/* Nav items lean toward the cursor. Transform only — moving the border would
+   reflow the whole sidebar. */
+.nav-item {
+  transition: transform 90ms var(--ease-out);
+}
+
+.nav-item:hover {
+  transform: translateX(2px);
+}
+
+.task-row[data-priority]::before {
+  transition: width 90ms var(--ease-out);
+}
+
+.task-row:hover[data-priority]::before {
+  width: 9px;
+}
+
+/* Choosing a colour reuses the checkbox stamp, so picking one feels like the
+   same physical act as completing a task. */
+.swatch[aria-pressed='true'] {
+  animation: checkbox-stamp 200ms var(--ease-out);
+}
+
+/* --- Deletion ------------------------------------------------------------
+   Deliberately unlike completion. Completing releases the row to the right;
+   deleting collapses it downward, so the two never read as the same event.
+   --row-height is measured in JS — animating from a guessed max-height makes
+   the first half of the collapse look like nothing is happening. */
+
+@keyframes task-delete {
+  0% {
+    opacity: 1;
+    max-height: var(--row-height, 120px);
+  }
+  55% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-top-width: 0;
+  }
+}
+
+.task-row[data-deleting='true'] {
+  overflow: hidden;
+  pointer-events: none;
+  animation: task-delete 220ms var(--ease-out) forwards;
+}
+
+/* --- Saved ---------------------------------------------------------------
+   Notes and titles save on blur and never said so. A failed save used to look
+   identical to a successful one. */
+
+@keyframes save-flash {
+  0%   { border-color: var(--done); }
+  70%  { border-color: var(--done); }
+  100% { border-color: var(--stroke); }
+}
+
+.task-notes[data-saved='true'],
+input.task-title[data-saved='true'] {
+  animation: save-flash 900ms var(--ease-out);
+}
+
+/* --- Error ---------------------------------------------------------------- */
+
+@keyframes error-shake {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  50%      { transform: translateX(4px); }
+  75%      { transform: translateX(-2px); }
+}
+
+.error-note {
+  animation: error-shake 220ms var(--ease-out);
+}
+
+/* --- Arrival on view change ----------------------------------------------
+   The list is keyed on the view, so switching remounts these and the stagger
+   plays. Rows inside a view are keyed by task id and do not remount, so this
+   never fires on completion. Capped at five — beyond that it reads as lag. */
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.task-list .task-row:nth-child(-n + 5) {
+  animation: row-in 160ms var(--ease-out) backwards;
+}
+
+.task-list .task-row:nth-child(2) { animation-delay: 30ms; }
+.task-list .task-row:nth-child(3) { animation-delay: 60ms; }
+.task-list .task-row:nth-child(4) { animation-delay: 90ms; }
+.task-list .task-row:nth-child(5) { animation-delay: 120ms; }
+
+/* Higher specificity than the stagger so a freshly captured task always drops
+   in rather than inheriting a view-change delay. */
+.task-list .task-row[data-entering='true'] {
+  animation: row-drop var(--thunk-ms) var(--ease-out);
+  animation-delay: 0ms;
+}
+
+.nav-row[data-entering='true'] {
+  animation: row-drop var(--thunk-ms) var(--ease-out);
+}
+
+/* --- Empty states --------------------------------------------------------
+   The one place ambient looping motion is allowed, because there is nothing
+   else on screen for it to compete with. */
+
+@keyframes empty-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.empty-title {
+  animation: empty-in 260ms var(--ease-out) backwards;
+}
+
+.empty-hint {
+  animation: empty-in 260ms var(--ease-out) 70ms backwards;
+}
+
+.empty-marks {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-lg);
+}
+
+.empty-marks span {
+  width: 10px;
+  height: 10px;
+  border: var(--stroke-width) solid var(--stroke);
+  animation: mark-drift 2.4s ease-in-out infinite;
+}
+
+.empty-marks span:nth-child(1) { background: var(--pastel-mint); }
+.empty-marks span:nth-child(2) { background: var(--baby-blue-eyes); animation-delay: 300ms; }
+.empty-marks span:nth-child(3) { background: var(--light-salmon); animation-delay: 600ms; }
+
+@keyframes mark-drift {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+
+/* --- Confetti ------------------------------------------------------------
+   Hard-edged squares, no blur and no physics, so it falls out of the design
+   system rather than fighting it. Only fires when you clear a whole view —
+   rare enough to stay charming, and the one thing allowed to be louder than a
+   single completion. */
+
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Behind the copy. A celebration that obscures the message it is celebrating
+     is just noise. */
+  z-index: 0;
+}
+
+.empty-title,
+.empty-hint,
+.empty-marks {
+  position: relative;
+  z-index: 1;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -16px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--brand-navy);
+  animation: confetti-fall var(--fall-ms, 900ms) var(--ease-out) var(--fall-delay, 0ms) forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(var(--fall-distance, 220px)) rotate(var(--fall-rotate, 90deg));
+  }
+}
+
 /* Every bit of delight above is optional. Completion still collapses the row
-   so the list stays correct — it just does it instantly. */
+   and deletion still removes it, so the list stays correct — they just do it
+   instantly. */
 @media (prefers-reduced-motion: reduce) {
   .task-row[data-completing='true'],
+  .task-row[data-deleting='true'],
   .task-row[data-entering='true'],
+  .task-list .task-row,
+  .nav-row[data-entering='true'],
   .capture-field[data-thunk='true'],
-  .nav-item-count {
+  .nav-item-count,
+  .error-note,
+  .empty-title,
+  .empty-hint,
+  .swatch[aria-pressed='true'],
+  .task-notes[data-saved='true'],
+  input.task-title[data-saved='true'] {
     animation-duration: 1ms;
+    animation-delay: 0ms;
   }
 
   .task-row[data-completing='true'] .task-checkbox,
@@ -828,8 +1061,23 @@ input.task-title:focus {
     animation-delay: 0ms;
   }
 
+  /* Ambient loops are the first thing to go. */
+  .empty-marks span,
+  .confetti-piece {
+    animation: none;
+  }
+
+  .confetti {
+    display: none;
+  }
+
+  .nav-item,
   .task-row[data-priority]::before {
     transition: none;
+  }
+
+  .nav-item:hover {
+    transform: none;
   }
 }
 
@@ -880,6 +1128,8 @@ input.task-title:focus {
 .empty {
   padding: var(--sp-2xl) var(--sp-md);
   text-align: center;
+  /* Anchors the confetti, which is absolutely positioned within this block. */
+  position: relative;
 }
 
 .empty-title {

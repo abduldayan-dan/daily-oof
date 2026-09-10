@@ -8,9 +8,13 @@ import { Workspace } from '../workspace'
  * Design preview with fixed mock data.
  *
  * Lets you work on globals.css without signing in or having a database — open
- * /design-preview, edit the CSS, watch it reload. Nothing here saves: the write
- * fails and the row rolls back, which is also a decent way to see the error
- * state on purpose.
+ * /design-preview, edit the CSS, watch it reload.
+ *
+ * The ids are real UUIDs on purpose. Postgres rejects a malformed uuid outright,
+ * so short ids like '1' made every write fail and roll back, which hid anything
+ * that only happens after a successful change — the cleared-view state and its
+ * confetti in particular. With valid uuids the write simply matches no rows and
+ * the UI behaves as it would for real. Nothing is ever persisted either way.
  *
  * Never reachable in production. The 404 below is the real guard; the matching
  * entry in the middleware allow list only keeps you from being redirected to
@@ -25,27 +29,29 @@ function iso(offsetDays: number) {
   return `${d.getFullYear()}-${month}-${day}`
 }
 
+const U = '00000000-0000-4000-8000-0000000000'
+
 const projects: Project[] = [
-  { id: 'p1', user_id: 'u', name: 'Onboarding', color: 'sky', archived: false, created_at: '2026-01-01' },
-  { id: 'p2', user_id: 'u', name: 'Design system', color: 'mint', archived: false, created_at: '2026-01-02' },
-  { id: 'p3', user_id: 'u', name: 'Q4 release', color: 'salmon', archived: false, created_at: '2026-01-03' },
+  { id: `${U}a1`, user_id: `${U}00`, name: 'Onboarding', color: 'sky', archived: false, created_at: '2026-01-01' },
+  { id: `${U}a2`, user_id: `${U}00`, name: 'Design system', color: 'mint', archived: false, created_at: '2026-01-02' },
+  { id: `${U}a3`, user_id: `${U}00`, name: 'Q4 release', color: 'salmon', archived: false, created_at: '2026-01-03' },
 ]
 
 const base = {
-  user_id: 'u',
+  user_id: `${U}00`,
   notes: null,
   completed_at: null,
   updated_at: '2026-09-01T09:00:00Z',
 }
 
 const tasks: Task[] = [
-  { ...base, id: '1', project_id: 'p1', title: 'Audit checkout flow against the design system', due_date: iso(-3), priority: 'high', created_at: '2026-09-01T09:00:00Z' },
-  { ...base, id: '2', project_id: 'p3', title: 'QA settings screen on mobile — 320px breakpoint', due_date: iso(-1), priority: 'medium', created_at: '2026-09-02T09:00:00Z' },
-  { ...base, id: '3', project_id: null, title: 'Redesign the empty state for search results', due_date: iso(0), priority: null, created_at: '2026-09-03T09:00:00Z' },
-  { ...base, id: '4', project_id: 'p2', title: 'Spacing pass on the nav PR', due_date: iso(2), priority: 'low', created_at: '2026-09-04T09:00:00Z', notes: 'Check the 8px grid on the dropdown.' },
-  { ...base, id: '5', project_id: 'p1', title: 'Write alt text for the illustration set', due_date: null, priority: null, created_at: '2026-09-05T09:00:00Z' },
-  { ...base, id: '6', project_id: null, title: 'Ask engineering about the focus ring token', due_date: null, priority: null, created_at: '2026-09-06T09:00:00Z' },
-  { ...base, id: '7', project_id: 'p2', title: 'Deprecate the old badge component', due_date: null, priority: null, created_at: '2026-08-20T09:00:00Z', completed_at: '2026-09-05T14:00:00Z' },
+  { ...base, id: `${U}01`, project_id: `${U}a1`, title: 'Audit checkout flow against the design system', due_date: iso(-3), priority: 'high', created_at: '2026-09-01T09:00:00Z' },
+  { ...base, id: `${U}02`, project_id: `${U}a3`, title: 'QA settings screen on mobile — 320px breakpoint', due_date: iso(-1), priority: 'medium', created_at: '2026-09-02T09:00:00Z' },
+  { ...base, id: `${U}03`, project_id: null, title: 'Redesign the empty state for search results', due_date: iso(0), priority: null, created_at: '2026-09-03T09:00:00Z' },
+  { ...base, id: `${U}04`, project_id: `${U}a2`, title: 'Spacing pass on the nav PR', due_date: iso(2), priority: 'low', created_at: '2026-09-04T09:00:00Z', notes: 'Check the 8px grid on the dropdown.' },
+  { ...base, id: `${U}05`, project_id: `${U}a1`, title: 'Write alt text for the illustration set', due_date: null, priority: null, created_at: '2026-09-05T09:00:00Z' },
+  { ...base, id: `${U}06`, project_id: null, title: 'Ask engineering about the focus ring token', due_date: null, priority: null, created_at: '2026-09-06T09:00:00Z' },
+  { ...base, id: `${U}07`, project_id: `${U}a2`, title: 'Deprecate the old badge component', due_date: null, priority: null, created_at: '2026-08-20T09:00:00Z', completed_at: '2026-09-05T14:00:00Z' },
 ]
 
 export default function DesignPreviewPage() {
@@ -56,7 +62,7 @@ export default function DesignPreviewPage() {
       initialTasks={tasks}
       initialProjects={projects}
       email="you@yourcompany.com"
-      userId="preview-user"
+      userId={`${U}00`}
     />
   )
 }

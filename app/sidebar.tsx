@@ -13,6 +13,7 @@ export function Sidebar({
   projects,
   counts,
   email,
+  enteringProjectId,
   onCreateProject,
   onUpdateProject,
   onDeleteProject,
@@ -23,6 +24,7 @@ export function Sidebar({
   projects: Project[]
   counts: { all: number; today: number; byProject: Map<string, number> }
   email: string
+  enteringProjectId: string | null
   onCreateProject: (name: string) => void
   onUpdateProject: (id: string, patch: Partial<Project>) => void
   onDeleteProject: (id: string) => void
@@ -82,7 +84,11 @@ export function Sidebar({
               onCancel={() => setEditingId(null)}
             />
           ) : (
-            <div className="nav-row" key={project.id}>
+            <div
+              className="nav-row"
+              key={project.id}
+              data-entering={enteringProjectId === project.id ? 'true' : undefined}
+            >
               <NavItem
                 label={project.name}
                 colour={normaliseColor(project.color)}
