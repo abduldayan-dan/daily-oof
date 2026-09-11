@@ -1077,9 +1077,20 @@ input.task-title[data-saved='true'] {
 
 .takeover-sweep span {
   flex: 1;
-  transform: translateY(100%);
-  animation: bar-sweep 1900ms var(--ease-out) forwards;
-  animation-delay: calc(var(--i) * 26ms);
+  animation-duration: var(--dur, 2600ms);
+  animation-timing-function: var(--ease-out);
+  animation-fill-mode: forwards;
+  animation-delay: calc(var(--i) * 22ms);
+}
+
+/* Alternating direction reads as the page closing over you, rather than a
+   single wipe passing across it. */
+.takeover-sweep span:nth-child(odd) {
+  animation-name: bar-close-up;
+}
+
+.takeover-sweep span:nth-child(even) {
+  animation-name: bar-close-down;
 }
 
 .takeover-sweep span:nth-child(1)  { background: var(--baby-pink); }
@@ -1095,37 +1106,125 @@ input.task-title[data-saved='true'] {
 .takeover-sweep span:nth-child(11) { background: var(--baby-purple); }
 .takeover-sweep span:nth-child(12) { background: var(--pastel-stone); }
 
-@keyframes bar-sweep {
+/* Percentage stops rather than fixed times, so the whole sequence stretches
+   with --dur and the hold gets longer on the moments worth reading. */
+@keyframes bar-close-up {
   0%   { transform: translateY(100%); }
-  26%  { transform: translateY(0); }
-  66%  { transform: translateY(0); }
+  15%  { transform: translateY(0); }
+  84%  { transform: translateY(0); }
   100% { transform: translateY(-100%); }
+}
+
+@keyframes bar-close-down {
+  0%   { transform: translateY(-100%); }
+  15%  { transform: translateY(0); }
+  84%  { transform: translateY(0); }
+  100% { transform: translateY(100%); }
+}
+
+/* --- Burst ---------------------------------------------------------------
+   Thrown outward from the centre on celebratory moments only. */
+
+.takeover-burst {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.takeover-burst span {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  animation: burst-out 1000ms var(--ease-out) var(--bd, 300ms) backwards;
+}
+
+@keyframes burst-out {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg) scale(0.3);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--bx), var(--by)) rotate(var(--br)) scale(1);
+  }
 }
 
 .takeover-copy {
   position: relative;
   text-align: center;
   padding: var(--sp-lg);
-  animation: takeover-copy 1900ms var(--ease-out) both;
+  max-width: min(90vw, 30em);
+  /* Holds at full opacity until late, then leaves. The individual pieces each
+     arrive on their own delay underneath this. */
+  animation: copy-hold var(--dur, 2600ms) linear forwards;
+}
+
+@keyframes copy-hold {
+  0%, 85%  { opacity: 1; transform: translateY(0); }
+  100%     { opacity: 0; transform: translateY(-14px); }
+}
+
+/* Tracking closing in is a mono idiom, and it gives the kicker something to do
+   other than fade. */
+.takeover-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.18em;
+  color: rgb(13 55 100 / 0.55);
+  margin-bottom: var(--sp-md);
+  animation: kicker-in 460ms var(--ease-out) 120ms backwards;
+}
+
+@keyframes kicker-in {
+  from { opacity: 0; letter-spacing: 0.5em; }
+  to   { opacity: 1; letter-spacing: 0.18em; }
 }
 
 .takeover-title {
   font-family: var(--font-serif);
-  font-size: clamp(2rem, 7vw, 3.5rem);
-  line-height: 1.05;
+  font-size: clamp(2.2rem, 8vw, 4.2rem);
+  line-height: 1.03;
   color: var(--brand-navy);
+}
+
+/* A word at a time. `white-space: pre` keeps the trailing space, which an
+   inline-block would otherwise collapse and run the words together. */
+.takeover-title span {
+  display: inline-block;
+  white-space: pre;
+  animation: word-rise 560ms var(--ease-out) backwards;
+  animation-delay: calc(240ms + var(--w) * 80ms);
+}
+
+@keyframes word-rise {
+  from { opacity: 0; transform: translateY(28px) rotate(-3deg); }
+  to   { opacity: 1; transform: translateY(0) rotate(0deg); }
 }
 
 .takeover-subtitle {
   font-size: var(--text-sm);
-  color: rgb(13 55 100 / 0.7);
-  margin-top: var(--sp-sm);
+  color: rgb(13 55 100 / 0.72);
+  margin-top: var(--sp-md);
+  animation: fade-up 520ms var(--ease-out) 880ms backwards;
 }
 
-@keyframes takeover-copy {
-  0%, 20%   { opacity: 0; transform: translateY(10px); }
-  34%, 60%  { opacity: 1; transform: translateY(0); }
-  76%, 100% { opacity: 0; transform: translateY(-8px); }
+.takeover-dismiss {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  color: rgb(13 55 100 / 0.38);
+  margin-top: var(--sp-2xl);
+  animation: fade-up 520ms var(--ease-out) 1300ms backwards;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* --- Nudges --------------------------------------------------------------
@@ -1157,15 +1256,6 @@ input.task-title[data-saved='true'] {
 
 .view-count {
   user-select: none;
-}
-
-/* --- Page-level celebration ---------------------------------------------- */
-
-.confetti-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  pointer-events: none;
 }
 
 /* --- Idle drift ----------------------------------------------------------
@@ -1257,11 +1347,25 @@ input.task-title[data-saved='true'] {
     animation-delay: 0ms;
   }
 
-  /* The takeover still appears and still dismisses itself — it just stops
-     sweeping. Holding the copy longer replaces the motion. */
-  .takeover-sweep span {
+  /* The takeover still appears, still reads, and still dismisses itself — it
+     just arrives all at once instead of assembling. */
+  .takeover-sweep span,
+  .takeover-title span,
+  .takeover-kicker,
+  .takeover-subtitle,
+  .takeover-dismiss {
     animation: none;
     transform: none;
+    opacity: 1;
+    letter-spacing: 0.18em;
+  }
+
+  .takeover-title span {
+    letter-spacing: normal;
+  }
+
+  .takeover-burst {
+    display: none;
   }
 
   /* Ambient loops are the first thing to go. */

@@ -117,14 +117,7 @@ export function Workspace({
   const [resetCapture, setResetCapture] = useState(0)
   const [idling, setIdling] = useState(false)
   const [showLifetime, setShowLifetime] = useState(false)
-  const [celebrating, setCelebrating] = useState(false)
   const combo = useRef<number[]>([])
-
-  useEffect(() => {
-    if (!celebrating) return
-    const id = setTimeout(() => setCelebrating(false), 1500)
-    return () => clearTimeout(id)
-  }, [celebrating])
 
   useEffect(() => {
     if (!showLifetime) return
@@ -159,6 +152,19 @@ export function Workspace({
     setTakeover((current) => current ?? content)
   }, [])
 
+  /**
+   * Anything discovered or earned takes the whole screen and holds long enough
+   * to actually read. Functional feedback — a duplicate warning, an undo
+   * confirmation — stays inline via showNudge; taking the screen away from
+   * someone mid-capture would fight the two-second target.
+   */
+  const celebrate = useCallback(
+    (content: Omit<TakeoverContent, 'ms' | 'tone'>) => {
+      queueTakeover({ ...content, ms: 3200, tone: 'burst' })
+    },
+    [queueTakeover],
+  )
+
   // Theme is read after mount rather than during render: localStorage does not
   // exist on the server, and reading it in render would mismatch on hydration.
   useEffect(() => setTheme(storedTheme()), [])
@@ -177,8 +183,12 @@ export function Workspace({
       })
       // The sequence ends in "b a", which lands in the autofocused capture box.
       setResetCapture((n) => n + 1)
-      showNudge({ text: 'inverted mode. you found it.' })
-    }, [showNudge]),
+      celebrate({
+        kicker: 'easter egg',
+        title: 'inverted mode.',
+        subtitle: 'it was in the design system all along. do it again to go back.',
+      })
+    }, [celebrate]),
   )
 
   useIdle(
@@ -201,20 +211,24 @@ export function Workspace({
     const years = claimAnniversary(initialTasks)
     if (years) {
       queueTakeover({
-        title: years === 1 ? 'one year of oofs' : `${years} years of oofs`,
-        subtitle: `${initialTasks.filter((t) => t.completed_at).length} finished so far`,
-        ms: 2600,
+        kicker: 'anniversary',
+        title: years === 1 ? 'one year of oofs.' : `${years} years of oofs.`,
+        subtitle: `${initialTasks.filter((t) => t.completed_at).length} finished so far.`,
+        ms: 3600,
+        tone: 'burst',
       })
       return
     }
     if (claimFirstOpenOfDay()) {
       queueTakeover({
+        kicker: 'good morning',
         title: new Date().toLocaleDateString(undefined, {
           weekday: 'long',
           day: 'numeric',
           month: 'long',
         }),
-        subtitle: 'a fresh set of oofs',
+        subtitle: 'a fresh set of oofs.',
+        ms: 2800,
       })
     }
   }, [initialTasks, queueTakeover])
@@ -316,17 +330,20 @@ export function Workspace({
         // until now it got exactly the same treatment as clearing three tasks
         // in Today.
         if (selectTasks(after, { kind: 'all' }).length === 0) {
-          queueTakeover({
+          celebrate({
+            kicker: 'all clear',
             title: 'nothing left.',
             subtitle: 'the whole list. gone.',
-            ms: 2400,
           })
         }
 
         const finished = completedCount(after)
         if (finished > 0 && finished % MILESTONE_EVERY === 0) {
-          setCelebrating(true)
-          showNudge({ text: `${finished} oofs survived.` })
+          celebrate({
+            kicker: 'milestone',
+            title: `${finished} oofs survived.`,
+            subtitle: 'that is a lot of things you did not want to do.',
+          })
         } else {
           // Chain completions that land close together, otherwise fall back to
           // a remark about this particular task.
@@ -335,10 +352,22 @@ export function Workspace({
             (t) => now - t < COMBO_WINDOW_MS,
           )
           if (combo.current.length >= COMBO_TARGET) {
-            showNudge({ text: `${combo.current.length} in a row.` })
+            celebrate({
+              kicker: 'combo',
+              title: `${combo.current.length} in a row.`,
+              subtitle: 'somebody is on a tear.',
+            })
           } else {
             const remark = completionRemark(task, oldestOpenId(tasks))
-            if (remark) showNudge({ text: remark })
+            if (remark?.big) {
+              celebrate({
+                kicker: 'finally',
+                title: remark.text,
+                subtitle: 'the oldest thing on your list. gone.',
+              })
+            } else if (remark) {
+              showNudge({ text: remark.text })
+            }
           }
         }
 
@@ -375,7 +404,7 @@ export function Workspace({
         setError(`Could not update that task — ${error.message}`)
       }
     },
-    [supabase, tasks, view, queueTakeover, showNudge],
+    [supabase, tasks, view, queueTakeover, showNudge, celebrate],
   )
 
   /** Resolves true when the write landed, so the row can confirm it visibly. */
@@ -497,11 +526,11 @@ export function Workspace({
   const signOut = useCallback(async () => {
     // Hold the farewell briefly rather than jumping straight to /login, which
     // reads like the app crashed.
-    queueTakeover({ title: 'see you tomorrow.', ms: 1400 })
+    queueTakeover({ kicker: 'signing out', title: 'see you tomorrow.', ms: 1800 })
     await supabase.auth.signOut()
     setTimeout(() => {
       window.location.href = '/login'
-    }, 1200)
+    }, 1600)
   }, [supabase, queueTakeover])
 
   // Lowercase throughout: UI copy is lowercase by design, not by oversight.
@@ -544,14 +573,6 @@ export function Workspace({
         <Takeover content={takeover} onDone={() => setTakeover(null)} />
       ) : null}
 
-      {/* Milestones fire wherever you happen to be, so this one is page-level
-          rather than living inside the empty state. */}
-      {celebrating ? (
-        <div className="confetti-layer" aria-hidden="true">
-          <Confetti />
-        </div>
-      ) : null}
-
       {idling ? (
         <div className="idle-drift" aria-hidden="true">
           <span />
@@ -588,6 +609,7 @@ export function Workspace({
               resetSignal={resetCapture}
               onCreate={createTask}
               onNudge={showNudge}
+              onCelebrate={celebrate}
             />
           )}
 

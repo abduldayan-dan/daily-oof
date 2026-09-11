@@ -143,13 +143,28 @@ export function avalancheLine(count: number): string {
   return ''
 }
 
-export function completionRemark(task: Task, oldestId: string | null): string {
+/** Age at which finishing something long-overdue earns the whole screen. */
+export const BIG_REMARK_DAYS = 14
+
+/**
+ * `big` decides between a full-page moment and an inline line. Clearing a
+ * three-day-old task should not stop the world; clearing something you have
+ * been avoiding for a month should.
+ */
+export function completionRemark(
+  task: Task,
+  oldestId: string | null,
+): { text: string; big: boolean } | null {
   const age = ageInDays(task.created_at)
+
   if (Date.now() - new Date(task.created_at).getTime() < QUICK_MS) {
-    return 'that was quick.'
+    return { text: 'that was quick.', big: false }
   }
   if (task.id === oldestId && age >= 2) {
-    return `that one took ${age} ${age === 1 ? 'day' : 'days'}.`
+    return {
+      text: `that one took ${age} ${age === 1 ? 'day' : 'days'}.`,
+      big: age >= BIG_REMARK_DAYS,
+    }
   }
-  return ''
+  return null
 }

@@ -59,13 +59,21 @@ export function Capture({
   resetSignal,
   onCreate,
   onNudge,
+  onCelebrate,
 }: {
   projects: Project[]
   view: View
   openTasks: Task[]
   resetSignal: number
   onCreate: (draft: Draft) => void
+  /** Inline, for functional feedback that must not interrupt typing. */
   onNudge: (nudge: Nudge) => void
+  /** Full-page, for anything discovered or earned. */
+  onCelebrate: (content: {
+    kicker?: string
+    title: string
+    subtitle?: string
+  }) => void
 }) {
   const [title, setTitle] = useState('')
   const [showAttrs, setShowAttrs] = useState(false)
@@ -118,7 +126,11 @@ export function Capture({
     )
     if (recent.current.length >= STREAK_TARGET) {
       recent.current = []
-      onNudge({ text: 'on a roll.' })
+      onCelebrate({
+        kicker: 'streak',
+        title: 'on a roll.',
+        subtitle: `${STREAK_TARGET} captured in under ${STREAK_WINDOW_MS / 1000} seconds.`,
+      })
     }
   }
 
@@ -151,7 +163,11 @@ export function Capture({
 
     // The task is still created — an easter egg that eats your input is a bug.
     if (key === 'oof') {
-      onNudge({ text: "we've all been there.", shake: true })
+      onCelebrate({
+        kicker: 'oof',
+        title: "we've all been there.",
+        subtitle: 'saved it anyway.',
+      })
     }
 
     trackStreak()
