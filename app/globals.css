@@ -249,7 +249,9 @@ button {
   font-size: 1.375rem;
   font-weight: 400;
   line-height: 1;
-  color: var(--brand-navy);
+  /* Must follow the theme. Hardcoding navy made the wordmark vanish against
+     the navy background in inverted mode. */
+  color: var(--text);
 }
 
 /* Used where the lockup is the page heading, so the product name is not
@@ -419,7 +421,7 @@ button {
 }
 
 .swatch:hover {
-  box-shadow: 2px 2px 0 var(--brand-navy);
+  box-shadow: 2px 2px 0 var(--stroke);
 }
 
 .editor-actions {
@@ -1019,7 +1021,7 @@ input.task-title[data-saved='true'] {
   top: -16px;
   width: 9px;
   height: 9px;
-  border: 2px solid var(--brand-navy);
+  border: 2px solid var(--stroke);
   animation: confetti-fall var(--fall-ms, 900ms) var(--ease-out) var(--fall-delay, 0ms) forwards;
 }
 
@@ -1032,6 +1034,192 @@ input.task-title[data-saved='true'] {
     opacity: 0;
     transform: translateY(var(--fall-distance, 220px)) rotate(var(--fall-rotate, 90deg));
   }
+}
+
+/* --- Inverted mode -------------------------------------------------------
+   Unlocked with the konami sequence. Not invented: DESIGN.md specifies
+   "Inverted mode: pastel on solid background (baby-cyan on navy)". Only the
+   role tokens move — the brand colours themselves stay exactly as defined. */
+
+[data-theme='inverted'] {
+  --bg: #0a2b50;
+  --bg-surface: #0d3764;
+  --bg-section: #082542;
+  --bg-hover: #114b86;
+  --bg-nested: #082542;
+
+  --stroke: var(--eggshell);
+  --text: var(--eggshell);
+  --text-secondary: rgb(245 240 227 / 0.72);
+  --text-chrome: rgb(245 240 227 / 0.5);
+
+  --accent: var(--baby-cyan);
+  --offset-shadow: 4px 4px 0 var(--eggshell);
+}
+
+/* --- Full-page takeover --------------------------------------------------- */
+
+.takeover {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.takeover-sweep {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.takeover-sweep span {
+  flex: 1;
+  transform: translateY(100%);
+  animation: bar-sweep 1900ms var(--ease-out) forwards;
+  animation-delay: calc(var(--i) * 26ms);
+}
+
+.takeover-sweep span:nth-child(1)  { background: var(--baby-pink); }
+.takeover-sweep span:nth-child(2)  { background: var(--pastel-rose); }
+.takeover-sweep span:nth-child(3)  { background: var(--light-salmon); }
+.takeover-sweep span:nth-child(4)  { background: var(--yellow); }
+.takeover-sweep span:nth-child(5)  { background: var(--pastel-sand); }
+.takeover-sweep span:nth-child(6)  { background: var(--pastel-mint); }
+.takeover-sweep span:nth-child(7)  { background: var(--powder-blue); }
+.takeover-sweep span:nth-child(8)  { background: var(--baby-cyan); }
+.takeover-sweep span:nth-child(9)  { background: var(--baby-blue-eyes); }
+.takeover-sweep span:nth-child(10) { background: var(--pastel-lavender); }
+.takeover-sweep span:nth-child(11) { background: var(--baby-purple); }
+.takeover-sweep span:nth-child(12) { background: var(--pastel-stone); }
+
+@keyframes bar-sweep {
+  0%   { transform: translateY(100%); }
+  26%  { transform: translateY(0); }
+  66%  { transform: translateY(0); }
+  100% { transform: translateY(-100%); }
+}
+
+.takeover-copy {
+  position: relative;
+  text-align: center;
+  padding: var(--sp-lg);
+  animation: takeover-copy 1900ms var(--ease-out) both;
+}
+
+.takeover-title {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 7vw, 3.5rem);
+  line-height: 1.05;
+  color: var(--brand-navy);
+}
+
+.takeover-subtitle {
+  font-size: var(--text-sm);
+  color: rgb(13 55 100 / 0.7);
+  margin-top: var(--sp-sm);
+}
+
+@keyframes takeover-copy {
+  0%, 20%   { opacity: 0; transform: translateY(10px); }
+  34%, 60%  { opacity: 1; transform: translateY(0); }
+  76%, 100% { opacity: 0; transform: translateY(-8px); }
+}
+
+/* --- Nudges --------------------------------------------------------------
+   Ephemeral one-liners. Never an error, so they do not borrow the error
+   styling — a marker rather than an alarm. */
+
+.nudge {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  border-left: var(--stroke-width) solid var(--brand-orange);
+  padding: var(--sp-xs) var(--sp-sm);
+  margin-bottom: var(--sp-md);
+  animation: empty-in 200ms var(--ease-out);
+}
+
+.nudge[data-shake='true'] {
+  animation: error-shake 300ms var(--ease-out);
+}
+
+.avalanche {
+  font-size: var(--text-xs);
+  color: var(--brand-orange);
+  margin-bottom: var(--sp-md);
+}
+
+.task-stale {
+  color: var(--text-chrome);
+}
+
+.view-count {
+  user-select: none;
+}
+
+/* --- Page-level celebration ---------------------------------------------- */
+
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+/* --- Idle drift ----------------------------------------------------------
+   The only thing in the app that moves without being asked. Kept slow and
+   sparse so it reads as the app resting rather than as something broken. */
+
+.idle-drift {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.idle-drift span {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: var(--stroke-width) solid var(--stroke);
+  animation: idle-cross 26s linear infinite;
+}
+
+.idle-drift span:nth-child(1) { top: 18%; background: var(--pastel-mint); }
+.idle-drift span:nth-child(2) { top: 46%; background: var(--baby-blue-eyes); animation-delay: -9s; }
+.idle-drift span:nth-child(3) { top: 74%; background: var(--light-salmon); animation-delay: -18s; }
+
+@keyframes idle-cross {
+  from { transform: translate(-8vw, 0) rotate(0deg); }
+  to   { transform: translate(108vw, -6vh) rotate(180deg); }
+}
+
+/* --- Completion variants -------------------------------------------------- */
+
+/* Finishing something you marked urgent should not feel identical to finishing
+   anything else — it is the one distinction the list bothers to make. */
+@keyframes task-complete-loud {
+  0%   { opacity: 1; transform: translateX(0); }
+  18%  { opacity: 1; transform: translateX(-10px); }
+  55%  { opacity: 1; transform: translateX(-10px); }
+  100% { opacity: 0; transform: translateX(46px); }
+}
+
+.task-row[data-completing='true'][data-priority='high'] {
+  animation: task-complete-loud 420ms var(--ease-out) forwards;
+}
+
+/* Putting one back reads as an undo rather than a silent reappearance. */
+@keyframes task-restore {
+  from { opacity: 0.35; transform: translateX(22px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.task-row[data-restoring='true'] {
+  animation: task-restore 260ms var(--ease-out);
 }
 
 /* Every bit of delight above is optional. Completion still collapses the row
@@ -1062,13 +1250,29 @@ input.task-title[data-saved='true'] {
     animation-delay: 0ms;
   }
 
+  .task-row[data-restoring='true'],
+  .nudge,
+  .takeover-copy {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+
+  /* The takeover still appears and still dismisses itself — it just stops
+     sweeping. Holding the copy longer replaces the motion. */
+  .takeover-sweep span {
+    animation: none;
+    transform: none;
+  }
+
   /* Ambient loops are the first thing to go. */
   .empty-marks span,
-  .confetti-piece {
+  .confetti-piece,
+  .idle-drift span {
     animation: none;
   }
 
-  .confetti {
+  .confetti,
+  .idle-drift {
     display: none;
   }
 

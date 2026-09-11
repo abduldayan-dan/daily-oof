@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { normaliseColor } from '@/lib/colors'
 import { formatCompleted, formatDue, isOverdue } from '@/lib/dates'
+import { STALE_DAYS, ageInDays } from '@/lib/eggs'
 import type { Priority, Project, Task } from '@/lib/types'
 
 /** Keep in step with the save-flash animation in globals.css. */
@@ -16,6 +17,7 @@ export function TaskRow({
   completing,
   entering,
   deleting,
+  restoring,
   onExpand,
   onToggle,
   onUpdate,
@@ -27,6 +29,7 @@ export function TaskRow({
   completing: boolean
   entering: boolean
   deleting: boolean
+  restoring: boolean
   onExpand: () => void
   onToggle: () => void
   onUpdate: (patch: Partial<Task>) => Promise<boolean>
@@ -89,6 +92,7 @@ export function TaskRow({
       data-completing={completing}
       data-entering={entering}
       data-deleting={deleting}
+      data-restoring={restoring}
       onClick={onExpand}
     >
       <button
@@ -146,6 +150,14 @@ export function TaskRow({
           {task.due_date && !done ? (
             <span className="task-meta-item task-due" data-overdue={overdue}>
               {formatDue(task.due_date)}
+            </span>
+          ) : null}
+
+          {/* A shrug rather than a nag. Somebody a month past a due date does
+              not need the app raising its voice at them. */}
+          {overdue && task.due_date && ageInDays(task.due_date) >= STALE_DAYS ? (
+            <span className="task-meta-item task-stale">
+              been here a while
             </span>
           ) : null}
 

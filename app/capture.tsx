@@ -1,9 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { todayISO } from '@/lib/dates'
-import type { Priority, Project, View } from '@/lib/types'
+import {
+  EMPTY_NAGS,
+  STREAK_TARGET,
+  STREAK_WINDOW_MS,
+  findDuplicate,
+} from '@/lib/eggs'
+import type { Priority, Project, Task, View } from '@/lib/types'
 
 export type Draft = {
   title: string
@@ -12,10 +18,8 @@ export type Draft = {
   priority: Priority | null
 }
 
-/**
- * Prompts rotate while the field is empty. Cheapest personality in the app —
- * it costs no motion and no pixels, only words.
- */
+export type Nudge = { text: string; shake?: boolean }
+
 /**
  * Rendered on the server too, so this must be the same on both sides. The
  * hour-aware set is swapped in after mount — computing the time during render
@@ -51,11 +55,17 @@ const PROMPT_MS = 4000
 export function Capture({
   projects,
   view,
+  openTasks,
+  resetSignal,
   onCreate,
+  onNudge,
 }: {
   projects: Project[]
   view: View
+  openTasks: Task[]
+  resetSignal: number
   onCreate: (draft: Draft) => void
+  onNudge: (nudge: Nudge) => void
 }) {
   const [title, setTitle] = useState('')
   const [showAttrs, setShowAttrs] = useState(false)
@@ -65,6 +75,12 @@ export function Capture({
   const [promptIndex, setPromptIndex] = useState(0)
   const [prompts, setPrompts] = useState<string[]>(DEFAULT_PROMPTS)
   const [thunk, setThunk] = useState(false)
+  const [nagIndex, setNagIndex] = useState(0)
+
+  // Captures inside the streak window, used to spot a brain-dump in progress.
+  const recent = useRef<number[]>([])
+  // The duplicate warning fires once per phrase; pressing Enter again saves it.
+  const warnedFor = useRef<string | null>(null)
 
   useEffect(() => {
     setPrompts(promptsForHour(new Date().getHours()))
@@ -73,9 +89,18 @@ export function Capture({
   // Never swap the prompt out from under someone mid-sentence.
   useEffect(() => {
     if (title) return
-    const id = setInterval(() => setPromptIndex((i) => i + 1), PROMPT_MS)
+    const id = setInterval(
+      () => setPromptIndex((i) => (i + 1) % prompts.length),
+      PROMPT_MS,
+    )
     return () => clearInterval(id)
-  }, [title])
+  }, [title, prompts.length])
+
+  // The konami sequence ends in "b a", which lands in this field. Clearing it
+  // here keeps the unlock from leaving litter behind.
+  useEffect(() => {
+    if (resetSignal > 0) setTitle('')
+  }, [resetSignal])
 
   // Capturing inside a view should inherit that view's context, but never
   // require it. Adding a task while looking at Today and having it not appear
@@ -86,9 +111,36 @@ export function Capture({
   const effectiveDueDate =
     dueDate || (view.kind === 'today' ? todayISO() : null)
 
+  function trackStreak() {
+    const now = Date.now()
+    recent.current = [...recent.current, now].filter(
+      (t) => now - t < STREAK_WINDOW_MS,
+    )
+    if (recent.current.length >= STREAK_TARGET) {
+      recent.current = []
+      onNudge({ text: 'on a roll.' })
+    }
+  }
+
   function submit() {
     const trimmed = title.trim()
-    if (!trimmed) return
+
+    // Enter on an empty field: escalate rather than doing nothing at all.
+    if (!trimmed) {
+      setNagIndex((i) => Math.min(i + 1, EMPTY_NAGS.length))
+      return
+    }
+
+    const key = trimmed.toLowerCase()
+
+    // Warn once about an exact duplicate, then get out of the way. The text
+    // stays in the field either way, so nothing is ever lost.
+    if (warnedFor.current !== key && findDuplicate(openTasks, trimmed)) {
+      warnedFor.current = key
+      onNudge({ text: 'you already said that.' })
+      return
+    }
+    warnedFor.current = null
 
     onCreate({
       title: trimmed.slice(0, 500),
@@ -96,6 +148,13 @@ export function Capture({
       due_date: effectiveDueDate,
       priority: priority || null,
     })
+
+    // The task is still created — an easter egg that eats your input is a bug.
+    if (key === 'oof') {
+      onNudge({ text: "we've all been there.", shake: true })
+    }
+
+    trackStreak()
 
     // Restart the thunk even on rapid captures: dropping the attribute for a
     // frame is what lets the animation replay.
@@ -105,7 +164,13 @@ export function Capture({
     // Clear the title but keep the attributes: capturing five tasks for the
     // same project in a row is common, re-picking it five times is not.
     setTitle('')
+    setNagIndex(0)
   }
+
+  const placeholder =
+    nagIndex > 0
+      ? EMPTY_NAGS[Math.min(nagIndex, EMPTY_NAGS.length) - 1]
+      : prompts[promptIndex % prompts.length]
 
   return (
     <div className="capture">
@@ -119,9 +184,12 @@ export function Capture({
           value={title}
           autoFocus
           maxLength={500}
-          placeholder={prompts[promptIndex % prompts.length]}
+          placeholder={placeholder}
           aria-label="New task"
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value)
+            if (nagIndex) setNagIndex(0)
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()

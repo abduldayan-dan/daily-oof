@@ -1,22 +1,43 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { createClient } from '@/lib/supabase/client'
 import { nextColor } from '@/lib/colors'
+import { todayISO } from '@/lib/dates'
+import {
+  COMBO_TARGET,
+  COMBO_WINDOW_MS,
+  IDLE_MS,
+  MILESTONE_EVERY,
+  avalancheLine,
+  claimAnniversary,
+  claimFirstOpenOfDay,
+  completedCount,
+  completionRemark,
+  oldestOpenId,
+  overdueCount,
+  storeTheme,
+  storedTheme,
+  type Theme,
+} from '@/lib/eggs'
 import { openCounts, selectTasks } from '@/lib/sort'
 import type { Project, Task, View } from '@/lib/types'
 
-import { Capture, type Draft } from './capture'
+import { Capture, type Draft, type Nudge } from './capture'
 import { Confetti } from './confetti'
 import { DoneSearch } from './done-search'
 import { DoneSummary } from './done-summary'
 import { Sidebar } from './sidebar'
+import { Takeover, type TakeoverContent } from './takeover'
 import { TaskRow } from './task-row'
+import { useIdle, useKonami } from './use-eggs'
 
 /** Keep these in step with --complete-ms and the delete animation in globals.css. */
 const COMPLETE_MS = 320
 const DELETE_MS = 220
+const RESTORE_MS = 260
+const NUDGE_MS = 2600
 
 type EmptyCopy = { title: string; hint: string }
 
@@ -87,6 +108,116 @@ export function Workspace({
   const [clearedView, setClearedView] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  // --- eggs ---------------------------------------------------------------
+  const [theme, setTheme] = useState<Theme>('default')
+  const [takeover, setTakeover] = useState<TakeoverContent | null>(null)
+  const [nudge, setNudge] = useState<Nudge | null>(null)
+  const [restoringId, setRestoringId] = useState<string | null>(null)
+  const [resetCapture, setResetCapture] = useState(0)
+  const [idling, setIdling] = useState(false)
+  const [showLifetime, setShowLifetime] = useState(false)
+  const [celebrating, setCelebrating] = useState(false)
+  const combo = useRef<number[]>([])
+
+  useEffect(() => {
+    if (!celebrating) return
+    const id = setTimeout(() => setCelebrating(false), 1500)
+    return () => clearTimeout(id)
+  }, [celebrating])
+
+  useEffect(() => {
+    if (!showLifetime) return
+    const id = setTimeout(() => setShowLifetime(false), 2400)
+    return () => clearTimeout(id)
+  }, [showLifetime])
+
+  const lastNudge = useRef<{ text: string; at: number } | null>(null)
+
+  /**
+   * Swallows an identical line repeated in quick succession. Completing the
+   * oldest task promotes the next one to oldest, so clearing a backlog would
+   * otherwise say "that one took 10 days" over and over and stop meaning
+   * anything.
+   */
+  const showNudge = useCallback((next: Nudge) => {
+    const now = Date.now()
+    const last = lastNudge.current
+    if (last && last.text === next.text && now - last.at < 10_000) return
+    lastNudge.current = { text: next.text, at: now }
+    setNudge(next)
+  }, [])
+
+  useEffect(() => {
+    if (!nudge) return
+    const id = setTimeout(() => setNudge(null), NUDGE_MS)
+    return () => clearTimeout(id)
+  }, [nudge])
+
+  /** One takeover at a time — a queue of full-page moments would be a pile-up. */
+  const queueTakeover = useCallback((content: TakeoverContent) => {
+    setTakeover((current) => current ?? content)
+  }, [])
+
+  // Theme is read after mount rather than during render: localStorage does not
+  // exist on the server, and reading it in render would mismatch on hydration.
+  useEffect(() => setTheme(storedTheme()), [])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme =
+      theme === 'inverted' ? 'inverted' : ''
+  }, [theme])
+
+  useKonami(
+    useCallback(() => {
+      setTheme((current) => {
+        const next: Theme = current === 'inverted' ? 'default' : 'inverted'
+        storeTheme(next)
+        return next
+      })
+      // The sequence ends in "b a", which lands in the autofocused capture box.
+      setResetCapture((n) => n + 1)
+      showNudge({ text: 'inverted mode. you found it.' })
+    }, [showNudge]),
+  )
+
+  useIdle(
+    IDLE_MS,
+    !idling && !takeover,
+    useCallback(() => setIdling(true), []),
+  )
+
+  useEffect(() => {
+    if (!idling) return
+    const wake = () => setIdling(false)
+    const events = ['keydown', 'mousedown', 'wheel', 'touchstart'] as const
+    events.forEach((e) => window.addEventListener(e, wake, { passive: true }))
+    return () => events.forEach((e) => window.removeEventListener(e, wake))
+  }, [idling])
+
+  // Once per calendar day, and once ever for an anniversary. Both claim their
+  // slot in localStorage as they fire, so neither repeats on a refresh.
+  useEffect(() => {
+    const years = claimAnniversary(initialTasks)
+    if (years) {
+      queueTakeover({
+        title: years === 1 ? 'one year of oofs' : `${years} years of oofs`,
+        subtitle: `${initialTasks.filter((t) => t.completed_at).length} finished so far`,
+        ms: 2600,
+      })
+      return
+    }
+    if (claimFirstOpenOfDay()) {
+      queueTakeover({
+        title: new Date().toLocaleDateString(undefined, {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        }),
+        subtitle: 'a fresh set of oofs',
+      })
+    }
+  }, [initialTasks, queueTakeover])
 
   const visible = useMemo(() => {
     const selected = selectTasks(tasks, view)
@@ -181,6 +312,36 @@ export function Workspace({
           setClearedView(viewKey(view))
         }
 
+        // Emptying the entire list is the rarest thing that happens here, and
+        // until now it got exactly the same treatment as clearing three tasks
+        // in Today.
+        if (selectTasks(after, { kind: 'all' }).length === 0) {
+          queueTakeover({
+            title: 'nothing left.',
+            subtitle: 'the whole list. gone.',
+            ms: 2400,
+          })
+        }
+
+        const finished = completedCount(after)
+        if (finished > 0 && finished % MILESTONE_EVERY === 0) {
+          setCelebrating(true)
+          showNudge({ text: `${finished} oofs survived.` })
+        } else {
+          // Chain completions that land close together, otherwise fall back to
+          // a remark about this particular task.
+          const now = Date.now()
+          combo.current = [...combo.current, now].filter(
+            (t) => now - t < COMBO_WINDOW_MS,
+          )
+          if (combo.current.length >= COMBO_TARGET) {
+            showNudge({ text: `${combo.current.length} in a row.` })
+          } else {
+            const remark = completionRemark(task, oldestOpenId(tasks))
+            if (remark) showNudge({ text: remark })
+          }
+        }
+
         setCompleting((prev) => new Set(prev).add(task.id))
         await new Promise((resolve) => setTimeout(resolve, COMPLETE_MS))
         setCompleting((prev) => {
@@ -188,6 +349,13 @@ export function Workspace({
           next.delete(task.id)
           return next
         })
+      } else {
+        // Putting one back. Play the completion in reverse so it reads as an
+        // undo rather than the row silently reappearing.
+        setRestoringId(task.id)
+        showNudge({ text: 'changed your mind?' })
+        await new Promise((resolve) => setTimeout(resolve, RESTORE_MS))
+        setRestoringId(null)
       }
 
       setTasks((prev) =>
@@ -207,7 +375,7 @@ export function Workspace({
         setError(`Could not update that task — ${error.message}`)
       }
     },
-    [supabase, tasks, view],
+    [supabase, tasks, view, queueTakeover, showNudge],
   )
 
   /** Resolves true when the write landed, so the row can confirm it visibly. */
@@ -327,9 +495,14 @@ export function Workspace({
   )
 
   const signOut = useCallback(async () => {
+    // Hold the farewell briefly rather than jumping straight to /login, which
+    // reads like the app crashed.
+    queueTakeover({ title: 'see you tomorrow.', ms: 1400 })
     await supabase.auth.signOut()
-    window.location.href = '/login'
-  }, [supabase])
+    setTimeout(() => {
+      window.location.href = '/login'
+    }, 1200)
+  }, [supabase, queueTakeover])
 
   // Lowercase throughout: UI copy is lowercase by design, not by oversight.
   const title =
@@ -341,10 +514,18 @@ export function Workspace({
           ? 'today'
           : 'done'
 
-  const countLabel =
-    view.kind === 'done'
+  const lifetime = completedCount(tasks)
+
+  const countLabel = showLifetime
+    ? `${lifetime} finished, all time`
+    : view.kind === 'done'
       ? `${visible.length} survived`
       : `${visible.length} ${visible.length === 1 ? 'oof' : 'oofs'}`
+
+  // Past a certain pile of overdue, encouragement stops landing. Naming it is
+  // kinder than pretending everything is on track.
+  const avalanche =
+    view.kind === 'done' ? '' : avalancheLine(overdueCount(tasks, todayISO()))
 
   const justCleared = clearedView === viewKey(view)
   const searching = view.kind === 'done' && query.trim().length > 0
@@ -358,7 +539,27 @@ export function Workspace({
       EMPTY_STATES[view.kind])
 
   return (
-    <div className="app">
+    <div className="app" data-idling={idling || undefined}>
+      {takeover ? (
+        <Takeover content={takeover} onDone={() => setTakeover(null)} />
+      ) : null}
+
+      {/* Milestones fire wherever you happen to be, so this one is page-level
+          rather than living inside the empty state. */}
+      {celebrating ? (
+        <div className="confetti-layer" aria-hidden="true">
+          <Confetti />
+        </div>
+      ) : null}
+
+      {idling ? (
+        <div className="idle-drift" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      ) : null}
+
       <Sidebar
         view={view}
         onSelect={selectView}
@@ -380,8 +581,21 @@ export function Workspace({
           {view.kind === 'done' ? (
             <DoneSearch value={query} onChange={setQuery} />
           ) : (
-            <Capture projects={projects} view={view} onCreate={createTask} />
+            <Capture
+              projects={projects}
+              view={view}
+              openTasks={tasks}
+              resetSignal={resetCapture}
+              onCreate={createTask}
+              onNudge={showNudge}
+            />
           )}
+
+          {nudge ? (
+            <p className="nudge" data-shake={nudge.shake || undefined} role="status">
+              {nudge.text}
+            </p>
+          ) : null}
 
           {view.kind === 'done' && !searching ? (
             <DoneSummary tasks={tasks} />
@@ -395,8 +609,19 @@ export function Workspace({
 
           <header className="view-header">
             <h1 className="view-title">{title}</h1>
-            <span className="view-count">{countLabel}</span>
+            {/* `detail` is the browser's own click counter, so a triple-click
+                needs no timers of our own. */}
+            <span
+              className="view-count"
+              onClick={(e) => {
+                if (e.detail === 3) setShowLifetime(true)
+              }}
+            >
+              {countLabel}
+            </span>
           </header>
+
+          {avalanche ? <p className="avalanche">{avalanche}</p> : null}
 
           {visible.length === 0 ? (
             <div className="empty">
@@ -423,6 +648,7 @@ export function Workspace({
                   completing={completing.has(task.id)}
                   entering={enteringId === task.id}
                   deleting={deletingId === task.id}
+                  restoring={restoringId === task.id}
                   onExpand={() =>
                     setExpandedId((id) => (id === task.id ? null : task.id))
                   }
